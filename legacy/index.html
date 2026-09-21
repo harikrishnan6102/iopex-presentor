@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>iOPEX Products — AI products built by iOPEX Technologies</title>
+<meta name="description" content="The iOPEX product suite: focused, production-grade AI tools for hiring, operations and customer experience. DigiVox, our AI interview and proctoring platform, is live today." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0a0a10; --bg-soft:#111219; --surface:#15161e; --surface-2:#1b1c26;
+    --text:#f1efe9; --text-dim:#989ea7; --text-faint:#5a5e68;
+    --iopex:#6f6cff; --iopex-2:#a99bff;
+    --ember:#f2661c; --gold:#ffc845; --scan:#33d8c2; --insight:#4fb0ff;
+    --line: rgba(255,255,255,.09); --line-strong: rgba(255,255,255,.17);
+    --shadow: 0 40px 110px rgba(0,0,0,.6);
+    --star-op:1;
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f3ef; --bg-soft:#eeebe3; --surface:#ffffff; --surface-2:#f4f1ea;
+    --text:#201d1a; --text-dim:#69645c; --text-faint:#a49d8f;
+    --iopex:#4b46d6; --iopex-2:#332ecf;
+    --ember:#e2590f; --gold:#b17600; --scan:#0d8f81; --insight:#1f6fbf;
+    --line: rgba(30,22,12,.1); --line-strong: rgba(30,22,12,.18);
+    --shadow: 0 40px 110px rgba(50,35,15,.14);
+    --star-op:.35;
+  }
+  *{box-sizing:border-box;}
+  ::selection{ background:var(--iopex); color:#fff; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden; transition:background .5s ease, color .5s ease;
+  }
+  h1,h2,h3,.disp{ font-family:'Space Grotesk', sans-serif; letter-spacing:-0.01em; margin:0; }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  p{ margin:0; }
+  a{ color:inherit; text-decoration:none; }
+  button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  img{ max-width:100%; display:block; }
+  section{ position:relative; padding: clamp(60px,9vh,110px) 0; }
+  .wrap{ width:min(1320px, 92vw); margin:0 auto; }
+  [data-anim]{ opacity:0; transform:translateY(28px); }
+  [data-anim].in{ opacity:1; transform:none; transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+  @media (min-width:2400px){ .wrap{ width:min(1680px, 78vw); } }
+
+  /* cursor */
+  .cur-dot,.cur-ring{ position:fixed; top:0; left:0; pointer-events:none; z-index:999; border-radius:50%; transform:translate(-50%,-50%); display:none; }
+  .cur-dot{ width:6px; height:6px; background:var(--iopex); z-index:1000; }
+  .cur-ring{ width:34px; height:34px; border:1px solid var(--line-strong); transition:width .25s ease,height .25s ease,border-color .25s ease,background .25s ease; }
+  .cur-ring.big{ width:70px; height:70px; background:rgba(111,108,255,.1); border-color:var(--iopex); }
+  .cur-ring.ember{ border-color:var(--ember); background:rgba(242,102,28,.1); }
+  /* Guided: the ring under the voice agent's control rather than the mouse.
+     Shown even on a coarse pointer, because the guide can be driving the page
+     on a touchscreen or a projector where no mouse ever moves. */
+  .cur-ring.guided{ display:block; width:78px; height:78px; border-width:2px;
+    border-color:var(--iopex); background:rgba(111,108,255,.12);
+    box-shadow:0 0 0 6px rgba(111,108,255,.07), 0 0 26px rgba(111,108,255,.35);
+    animation:curPulse 1.9s ease-in-out infinite; }
+  .cur-dot.guided{ display:block; width:8px; height:8px; background:var(--iopex); }
+  /* Pinched: the gesture equivalent of a mouse button held down. */
+  .cur-ring.grabbing{ width:52px; height:52px; border-color:var(--ember);
+    background:rgba(242,102,28,.18); animation:none;
+    box-shadow:0 0 0 4px rgba(242,102,28,.12), 0 0 30px rgba(242,102,28,.5); }
+  @keyframes curPulse{
+    0%,100%{ box-shadow:0 0 0 6px rgba(111,108,255,.07), 0 0 26px rgba(111,108,255,.35); }
+    50%    { box-shadow:0 0 0 14px rgba(111,108,255,0), 0 0 34px rgba(111,108,255,.5); }
+  }
+  @media (prefers-reduced-motion: reduce){ .cur-ring.guided{ animation:none; } }
+  html.fine .cur-dot, html.fine .cur-ring{ display:block; }
+
+  /* dock */
+  .dock{ position:fixed; top:0; left:0; right:0; z-index:80; display:flex; align-items:center; justify-content:space-between; padding: clamp(14px,2.2vh,24px) clamp(18px,3vw,48px); backdrop-filter:blur(14px); background:linear-gradient(var(--bg) 40%, transparent); }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-logo{ height:26px; width:auto; display:block; }
+  footer .brand-logo{ height:24px; }
+  .nav-links{ display:flex; gap:32px; font-size:14px; color:var(--text-dim); }
+  .nav-links a:hover{ color:var(--text); }
+  .dock-right{ display:flex; align-items:center; gap:10px; }
+  .theme-btn{ width:38px; height:38px; border-radius:50%; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; background:var(--surface); }
+  .theme-btn svg{ width:16px; height:16px; }
+  .btn{ display:inline-flex; align-items:center; gap:8px; padding:11px 22px; border-radius:100px; font-size:14px; font-weight:600; white-space:nowrap; }
+  .btn-primary{ background:linear-gradient(120deg,var(--iopex),var(--iopex-2)); color:#fff; }
+  .btn-ember{ background:linear-gradient(120deg,var(--ember),var(--gold)); color:#181109; }
+  .btn-ghost{ border:1px solid var(--line-strong); background:var(--surface); }
+  .btn-ghost:hover{ border-color:var(--iopex); }
+  .btn-disabled{ border:1px solid var(--line-strong); background:var(--surface); color:var(--text-faint); }
+  @media (max-width:900px){ .nav-links{ display:none; } }
+
+  /* eyebrow / headings (shared) */
+  .eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); margin-bottom:16px; }
+  .eyebrow i{ width:16px; height:1px; background:var(--iopex); display:inline-block; }
+  .eyebrow.ember i{ background:var(--ember); }
+  .lede{ font-size:clamp(15px,1.15vw,18px); color:var(--text-dim); line-height:1.6; max-width:52ch; }
+  .h-title{ font-size:clamp(28px,3.6vw,46px); line-height:1.05; font-weight:600; }
+  .tag{ font-size:11px; padding:4px 10px; border-radius:100px; border:1px solid var(--line); }
+  .tag.b1{ color:var(--gold); border-color:rgba(255,200,69,.4); }
+  .tag.b2{ color:var(--scan); border-color:rgba(51,216,194,.4); }
+  .tag.status{ background:var(--surface-2); color:var(--text-dim); }
+
+  /* kinetic grid background */
+  #kinetic{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+  /* -------- HERO -------- */
+  .hero{ position:relative; min-height:100vh; display:flex; align-items:center; padding:150px 0 80px; overflow:hidden; }
+  .hero .wrap{ position:relative; z-index:2; text-align:center; }
+  .hero .eyebrow{ justify-content:center; width:100%; }
+  .hero-spot{ margin:8px 0 40px; }
+  .spot-h{ font-size:clamp(28px,4vw,46px); font-weight:600; }
+  .spot-sub{ font-size:13.5px; color:var(--text-dim); margin:12px 0 34px; }
+  .hero p.lede{ margin:24px auto 0; text-align:center; }
+  .hero-cta{ display:flex; gap:16px; justify-content:center; margin-top:36px; flex-wrap:wrap; }
+  .fact-row{ display:flex; justify-content:center; gap:clamp(28px,4vw,64px); margin-top:70px; flex-wrap:wrap; }
+  .fact b{ display:block; font-family:'Space Grotesk'; font-size:clamp(22px,2vw,30px); }
+  .fact span{ font-size:11.5px; color:var(--text-faint); }
+
+  /* -------- PRODUCTS GRID -------- */
+  .sec-head{ text-align:left; max-width:60ch; margin-bottom:48px; }
+  .sec-head h2{ font-size:clamp(28px,3.6vw,46px); font-weight:600; }
+  .products-grid{ display:grid; grid-template-columns:1.1fr .95fr .95fr; gap:20px; }
+  .p-card{ position:relative; border:1px solid var(--line); border-radius:22px; padding:30px 26px; background:var(--surface); overflow:hidden; transition:transform .4s ease, border-color .4s ease; }
+  .p-card:hover{ transform:translateY(-6px); }
+  .p-card.live{ border-color:rgba(242,102,28,.35); }
+  .p-glow{ position:absolute; top:-40%; right:-30%; width:70%; height:70%; border-radius:50%; filter:blur(60px); opacity:.35; pointer-events:none; }
+  .p-status{ display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:5px 11px; border-radius:100px; border:1px solid var(--line-strong); margin-bottom:20px; }
+  .p-status .dot{ width:6px; height:6px; border-radius:50%; }
+  .p-status.live .dot{ background:#3ddc84; box-shadow:0 0 0 3px rgba(61,220,132,.2); }
+  .p-status.dev .dot{ background:var(--text-faint); }
+  .p-card h3{ font-size:22px; margin-bottom:6px; }
+  .p-card .tagline{ font-size:12.5px; color:var(--text-dim); margin-bottom:16px; }
+  .p-card p.desc{ font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:24px; }
+  .p-card .go{ display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ember); }
+  .p-card.dev .go{ color:var(--text-faint); }
+  .p-card .go svg{ width:14px; height:14px; transition:transform .25s ease; }
+  .p-card:hover .go svg{ transform:translateX(4px); }
+  @media (max-width:1000px){ .products-grid{ grid-template-columns:1fr; } }
+
+  /* -------- SPOTLIGHT CAROUSEL (in hero) -------- */
+  .stage-wrap{ position:relative; }
+  .stage{ position:relative; height:clamp(320px,52vh,520px); perspective:1600px; }
+  .frame{ position:absolute; top:0; left:50%; width:min(560px,72vw); height:100%; margin-left:-280px; border-radius:20px; overflow:hidden; border:1px solid var(--line-strong); box-shadow:var(--shadow); background:var(--surface); cursor:inherit; transform-style:preserve-3d; transition:opacity .15s linear; user-select:none; -webkit-user-select:none; }
+  @media (max-width:640px){ .frame{ margin-left:-36vw; } }
+  .frame .fbar{ height:34px; background:var(--surface-2); display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid var(--line); }
+  .frame .fbar span{ width:8px; height:8px; border-radius:50%; background:var(--line-strong); }
+  .frame img{ width:100%; height:calc(100% - 34px); object-fit:contain; object-position:center top; display:block; background:var(--surface-2); pointer-events:none; -webkit-user-drag:none; }
+  .frame .fplaceholder{ width:100%; height:calc(100% - 34px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:20px; pointer-events:none; }
+  .frame .fplaceholder b{ font-family:'Space Grotesk'; font-size:22px; }
+  .frame .fplaceholder span{ font-size:12px; color:var(--text-faint); }
+  .frame .fplaceholder .badge{ font-size:11px; padding:5px 12px; border-radius:100px; border:1px solid var(--line-strong); color:var(--text-dim); }
+  .live-pill{ position:absolute; top:14px; left:14px; z-index:4; display:flex; align-items:center; gap:6px; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); color:#fff; font-size:11px; font-weight:600; padding:5px 11px 5px 8px; border-radius:100px; }
+  .live-pill .d{ width:7px; height:7px; border-radius:50%; background:#3ddc84; animation:pulse 1.8s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  .caption{ text-align:center; margin-top:34px; }
+  .caption h3{ font-size:clamp(18px,2vw,24px); margin-bottom:8px; }
+  .caption p{ font-size:13.5px; color:var(--text-dim); }
+  .dots{ display:flex; justify-content:center; gap:9px; margin-top:26px; }
+  .dots button{ width:8px; height:8px; border-radius:50%; background:var(--line-strong); transition:all .25s ease; }
+  .dots button.active{ width:22px; border-radius:5px; background:var(--ember); }
+  .stage-cta{ text-align:center; margin-top:30px; }
+
+  /* -------- DIGIVOX PRODUCT ZONE -------- */
+  #digivox{ background:radial-gradient(120% 60% at 50% 0%, rgba(242,102,28,.06), transparent 60%); border-top:1px solid var(--line); }
+  .dv-intro .wrap{ display:grid; grid-template-columns:.92fr 1.08fr; gap:40px; align-items:center; }
+  .dv-intro h2{ font-size:clamp(34px,5vw,64px); line-height:1.02; font-weight:600; }
+  .dv-intro .line2{ color:var(--text-dim); }
+  .dv-logo-sm{ height:24px; width:auto; margin-bottom:16px; }
+  .stat-row{ display:flex; gap:clamp(20px,3vw,40px); margin-top:44px; flex-wrap:wrap; }
+  .stat b{ font-family:'Space Grotesk'; font-size:clamp(20px,1.8vw,28px); display:block; }
+  .stat span{ font-size:11.5px; color:var(--text-faint); }
+  .orb-stage{ position:relative; aspect-ratio:1/1; max-height:66vh; width:100%; justify-self:center; }
+  .orb-stage canvas{ width:100% !important; height:100% !important; }
+  .dv-logo{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:46%; max-width:340px; height:auto; z-index:3; pointer-events:none; filter:drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  .orb-caption{ position:absolute; bottom:6%; left:50%; transform:translateX(-50%); font-size:11px; color:var(--text-faint); font-family:'JetBrains Mono'; letter-spacing:.04em; text-align:center; white-space:nowrap; }
+
+  #dv-why .wrap, #dv-scoring .wrap{ display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #dv-setup .wrap{ display:grid; grid-template-columns:.85fr 1.15fr; gap:52px; align-items:center; }
+  #dv-voices .wrap{ display:grid; grid-template-columns:.9fr 1.1fr; gap:52px; align-items:center; }
+  .quote-block p{ font-size:clamp(19px,2.3vw,28px); line-height:1.35; font-family:'Space Grotesk'; font-weight:500; }
+  .pain-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:28px; }
+  .pain-card{ border:1px solid var(--line); border-radius:16px; padding:18px; background:var(--surface); }
+  .pain-card b{ display:block; font-size:24px; font-family:'Space Grotesk'; margin-bottom:6px; color:var(--ember); }
+  .pain-card span{ font-size:12.5px; color:var(--text-dim); }
+
+  .tilt-card{ perspective:1400px; }
+  .shot-frame{ border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:var(--shadow); background:var(--surface); }
+  .shot-frame .fbar{ height:32px; background:var(--surface-2); display:flex; align-items:center; gap:6px; padding:0 14px; border-bottom:1px solid var(--line); }
+  .shot-frame .fbar span{ width:8px; height:8px; border-radius:50%; background:var(--line-strong); }
+  .shot-frame img{ display:block; width:100%; height:auto; }
+  .peek-shot{ position:absolute; width:50%; top:-11%; right:-11%; z-index:-1; border-radius:16px; overflow:hidden; border:1px solid var(--line); box-shadow:var(--shadow); transform:rotate(7deg); opacity:.9; background:var(--surface); }
+  .peek-shot img{ display:block; width:100%; }
+  @media (max-width:1080px){ .peek-shot{ display:none; } }
+  @media (max-width:900px){ #dv-platform::before{ opacity:.08; background-size:70% auto; } }
+  .float-tag{ position:absolute; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:8px 12px; font-size:11.5px; box-shadow:var(--shadow); display:flex; gap:8px; align-items:center; }
+  .float-tag i{ width:7px; height:7px; border-radius:50%; background:var(--scan); }
+  .chip-row{ display:flex; align-items:center; gap:10px; margin-top:30px; flex-wrap:wrap; }
+
+  .persona-strip{ display:flex; flex-direction:column; gap:10px; }
+  .persona{ display:flex; gap:14px; align-items:center; border:1px solid var(--line); border-radius:16px; padding:12px 14px; cursor:pointer; background:var(--surface); transition:border-color .25s ease, background .25s ease; }
+  .persona.active{ border-color:var(--ember); background:var(--surface-2); }
+  .av{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk'; font-weight:600; font-size:14px; color:#1a1208; flex-shrink:0; }
+  .persona .meta b{ display:block; font-size:14px; }
+  .persona .meta span{ font-size:11.5px; color:var(--text-dim); }
+  .tuner{ border:1px solid var(--line); border-radius:20px; padding:22px 26px 26px; background:var(--surface); }
+  .slider-row{ margin-bottom:18px; }
+  .slider-row .top{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:8px; }
+  .slider-row .top b{ font-weight:500; }
+  .slider-row .top .val{ font-family:'JetBrains Mono'; color:var(--ember); }
+  input[type=range]{ -webkit-appearance:none; width:100%; height:4px; border-radius:3px; background:var(--line-strong); outline:none; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--ember); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--ember); cursor:pointer; }
+  .eq{ display:flex; align-items:flex-end; gap:4px; height:54px; margin-top:22px; }
+  .eq span{ width:100%; border-radius:3px 3px 0 0; background:linear-gradient(180deg,var(--gold),var(--scan)); }
+
+  .ring-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .ring-card{ border:1px solid var(--line); border-radius:18px; padding:18px; background:var(--surface); display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .ring-card svg{ width:84px; height:84px; }
+  .ring-card b{ font-family:'Space Grotesk'; font-size:12.5px; }
+  .ring-card .num{ font-family:'JetBrains Mono'; font-size:20px; }
+  .level-tags{ display:flex; gap:8px; margin-top:20px; }
+
+  #dv-platform{ position:relative; overflow:hidden; }
+  #dv-platform::before{
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+    background-image:url('https://aurora.growatiopex.com/sites/default/files/2026-09/incproctor.png'); background-repeat:no-repeat;
+    background-position:right -4% center; background-size:52% auto;
+    opacity:.14;
+    -webkit-mask-image:linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,.55) 42%, transparent 78%);
+    mask-image:linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,.55) 42%, transparent 78%);
+  }
+  :root[data-theme="light"] #dv-platform::before{ opacity:.08; }
+  #dv-platform .wrap{ position:relative; z-index:1; }
+  #dv-platform .cap-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:40px; }
+  @property --beam-angle{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+  .cap-card{
+    position:relative; overflow:hidden; border:1px solid var(--line); border-radius:18px;
+    padding:22px 20px; background:var(--surface);
+    transition:transform .35s ease, border-color .35s ease, background .35s ease;
+  }
+  .cap-card::before{
+    content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px;
+    background:conic-gradient(from var(--beam-angle), transparent 0%, transparent 78%, var(--ember) 86%, var(--gold) 92%, var(--scan) 97%, transparent 100%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    animation:beam-spin 4.5s linear infinite;
+    pointer-events:none;
+  }
+  @keyframes beam-spin{ to{ --beam-angle:360deg; } }
+  @media (prefers-reduced-motion: reduce){ .cap-card::before{ animation:none; } }
+  .cap-card:hover{ transform:translateY(-6px); border-color:var(--ember); background:var(--surface-2); }
+  .cap-num{ font-family:'JetBrains Mono'; font-size:11px; color:var(--ember); margin-bottom:14px; display:block; }
+  .cap-card h3{ font-size:16.5px; margin-bottom:10px; }
+  .cap-card p{ font-size:12.5px; color:var(--text-dim); line-height:1.55; }
+
+  #dv-results .benefit-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:44px; }
+  .benefit{ border:1px solid var(--line); border-radius:18px; padding:20px 16px; text-align:left; background:var(--surface); }
+  .benefit .ico{ width:34px; height:34px; border-radius:10px; border:1px solid rgba(242,102,28,.25); background:rgba(242,102,28,.07); display:flex; align-items:center; justify-content:center; margin-bottom:16px; flex-shrink:0; }
+  .benefit .ico svg{ width:18px; height:18px; stroke:var(--ember); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .benefit b{ display:block; font-size:14px; margin-bottom:6px; }
+  .benefit span{ font-size:11.5px; color:var(--text-dim); line-height:1.5; }
+
+  .dv-cta{ position:relative; overflow:hidden; text-align:center; border-top:1px solid var(--line); }
+  .dv-cta h2{ font-size:clamp(28px,4vw,48px); font-weight:600; }
+  .dv-cta .hero-cta{ margin-top:26px; }
+  .dv-cta::before{
+    content:''; position:absolute; inset:-20% -10%; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(38% 55% at 22% 30%, rgba(242,102,28,.16), transparent 70%),
+      radial-gradient(34% 50% at 78% 65%, rgba(255,200,69,.13), transparent 70%),
+      radial-gradient(30% 46% at 50% 85%, rgba(51,216,194,.10), transparent 70%);
+    filter:blur(60px);
+    animation:aurora-drift 22s ease-in-out infinite alternate;
+  }
+  :root[data-theme="light"] .dv-cta::before{ opacity:.6; }
+  @keyframes aurora-drift{
+    0%{ transform:translate3d(0,0,0) scale(1); }
+    50%{ transform:translate3d(2%,-3%,0) scale(1.08); }
+    100%{ transform:translate3d(-3%,2%,0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce){ .dv-cta::before{ animation:none; } }
+  .dv-cta .wrap{ position:relative; z-index:1; }
+
+  @media (max-width:1080px){
+    .dv-intro .wrap, #dv-why .wrap, #dv-setup .wrap, #dv-voices .wrap, #dv-scoring .wrap{ grid-template-columns:1fr !important; gap:34px; }
+    .orb-stage{ order:-1; max-height:46vh; }
+    #dv-platform .cap-grid{ grid-template-columns:1fr 1fr; }
+    #dv-results .benefit-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width:640px){
+    #dv-platform .cap-grid{ grid-template-columns:1fr; }
+    #dv-results .benefit-grid{ grid-template-columns:1fr; }
+    .pain-grid{ grid-template-columns:1fr; }
+  }
+
+  /* -------- FOOTER -------- */
+  footer{ border-top:1px solid var(--line); padding: 60px 0 40px; }
+  .foot-row{ display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:30px; }
+  .foot-links{ display:flex; gap:34px; font-size:13px; color:var(--text-dim); }
+  .foot-links a:hover{ color:var(--iopex); }
+  .foot-meta{ font-size:11.5px; color:var(--text-faint); margin-top:10px; }
+
+  @media (max-width:640px){ .btn-ghost{ display:none; } .fact-row{ gap:22px; } }
+</style>
+</head>
+<body>
+
+  <div class="cur-dot"></div><div class="cur-ring"></div>
+
+  <header class="dock">
+    <div class="brand">
+      <a href="#" aria-label="Back to top" style="display:flex;align-items:center;">
+        <img class="brand-logo" id="brandLogo" src="" alt="iOPEX Technologies">
+      </a>
+    </div>
+    <nav class="nav-links">
+      <a href="#products">Products</a>
+      <a href="#digivox">DigiVox</a>
+    </nav>
+    <div class="dock-right">
+      <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a class="btn btn-primary" href="mailto:hello@iopex.com">Talk to us</a>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <canvas id="kinetic"></canvas>
+    <div class="wrap">
+
+      <div id="spotlight" class="hero-spot" data-anim>
+        <h2 class="spot-h">Our products, one at a time.</h2>
+        <p class="spot-sub">Click a product to jump into its full tour below.</p>
+        <div class="stage-wrap">
+          <div class="stage" id="stage"></div>
+        </div>
+        <div class="caption">
+          <h3 id="capTitle">DigiVox</h3>
+          <p id="capDesc">AI interview and proctoring platform — live today.</p>
+        </div>
+        <div class="dots" id="carDots"></div>
+        <div class="stage-cta">
+          <a class="btn btn-ember" id="stageCtaBtn" href="#digivox" data-hover>Explore the DigiVox product tour</a>
+        </div>
+      </div>
+
+      <p class="lede" data-anim>iOPEX builds focused, production-grade AI tools for hiring, operations and customer experience. DigiVox — our AI interview and proctoring platform — is live today, with more of the suite on the way.</p>
+      <div class="hero-cta" data-anim>
+        <a class="btn btn-primary" href="#digivox">Open DigiVox</a>
+        <a class="btn btn-ghost" href="#products">See all products</a>
+      </div>
+      <div class="fact-row" data-anim>
+        <div class="fact"><b>2009</b><span>founded</span></div>
+        <div class="fact"><b>3,000+</b><span>specialists worldwide</span></div>
+        <div class="fact"><b>Fortune 500</b><span>clients served</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCTS GRID -->
+  <section id="products">
+    <div class="wrap">
+      <div class="sec-head" data-anim>
+        <div class="eyebrow"><i></i>What we're building</div>
+        <h2>One platform team, a growing set of products.</h2>
+      </div>
+      <div class="products-grid">
+        <a class="p-card live" data-anim href="#digivox" data-hover>
+          <div class="p-glow" style="background:radial-gradient(circle, var(--ember), transparent 70%);"></div>
+          <div class="p-status live"><span class="dot"></span>Live</div>
+          <img class="dv-logo-sm" id="dvLogoCard" src="" alt="DigiVox">
+          <div class="tagline">AI interview &amp; proctoring platform</div>
+          <p class="desc">Automated scheduling, adaptive live interviews, explainable scoring and bias-mitigation controls, in one workflow.</p>
+          <span class="go">Open DigiVox <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+        <a class="p-card live" id="digiauraCard" data-anim href="http://localhost:5173/?from=products" data-hover>
+          <div class="p-glow" style="background:radial-gradient(circle, var(--scan), transparent 70%);"></div>
+          <div class="p-status"><span class="dot"></span>In build</div>
+          <h3>DigiAura</h3>
+          <div class="tagline">Enterprise agentic AI platform</div>
+          <p class="desc">A governed platform for multi-agent work — orchestration, isolated execution, shared knowledge and embedded oversight. Walk the living architecture.</p>
+          <span class="go">Open the architecture map
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </span>
+        </a>
+        <div class="p-card dev" data-anim>
+          <div class="p-glow" style="background:radial-gradient(circle, var(--insight), transparent 70%);"></div>
+          <div class="p-status dev"><span class="dot"></span>Coming soon</div>
+          <h3>DigiCoach</h3>
+          <div class="tagline">From iOPEX</div>
+          <p class="desc">Details and a screen tour are on the way as this product gets closer to launch.</p>
+          <span class="go">Coming soon</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DIGIVOX PRODUCT ZONE ================= -->
+  <div id="digivox">
+
+    <!-- intro -->
+    <section class="dv-intro">
+      <div class="wrap">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>AI interview &amp; proctoring platform</div>
+          <h2>Interviews that<br><span class="line2">actually listen.</span></h2>
+          <p class="lede" style="margin-top:20px;">DigiVox runs live, adaptive interviews end to end — scheduling, questioning, scoring, and proctoring — so your hiring team spends its time deciding, not coordinating.</p>
+          <div class="stat-row">
+            <div class="stat"><b class="mono" data-count="1200" data-suffix="+">0</b><span>candidates interviewed</span></div>
+            <div class="stat"><b class="mono" data-count="800" data-suffix="+">0</b><span>interviews · Manila</span></div>
+            <div class="stat"><b class="mono" data-count="300" data-suffix="+">0</b><span>interviews · India</span></div>
+          </div>
+        </div>
+        <div class="orb-stage">
+          <canvas id="orb"></canvas>
+          <img class="dv-logo" id="dvLogo" src="" alt="DigiVox">
+          <div class="orb-caption mono">live signal · behavioral &amp; NLP analysis</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- why -->
+    <section id="dv-why">
+      <div class="wrap">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>Why we built this</div>
+          <div class="quote-block">
+            <p>Scheduling across time zones, inconsistent evaluations, and unconscious bias were quietly taxing every hiring manager's week.</p>
+          </div>
+          <div class="pain-grid">
+            <div class="pain-card"><b>3–5 days</b><span>lost per role to interviewer scheduling and reshuffling</span></div>
+            <div class="pain-card"><b>Uneven</b><span>rubrics, since every interviewer scores a little differently</span></div>
+            <div class="pain-card"><b>Manual</b><span>note-taking that competes with actually listening</span></div>
+            <div class="pain-card"><b>Blind spots</b><span>on communication and behavioral fit until much later</span></div>
+          </div>
+        </div>
+        <div class="tilt-card" data-tilt data-anim style="position:relative;">
+          <div class="shot-frame">
+            <div class="fbar"><span></span><span></span><span></span></div>
+            <img src="https://aurora.growatiopex.com/sites/default/files/2026-09/digivox-homescreen.png" alt="DigiVox home screen — My Interviews dashboard" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- setup -->
+    <section id="dv-setup">
+      <div class="wrap">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>01 · Interview setup</div>
+          <h2 class="h-title">Brief it like you'd<br>brief a colleague.</h2>
+          <p class="lede" style="margin-top:20px;">Name the role, pick the team, and choose a voice for the interview. DigiVox handles the rest — question generation, delivery, and a rubric matched to the role.</p>
+          <div class="chip-row">
+            <span class="tag" style="border-color:var(--line-strong);">Questions</span>
+            <span class="tag" style="border-color:var(--line-strong);">Metrics</span>
+            <span class="tag" style="border-color:var(--line-strong);">Selection criteria</span>
+          </div>
+        </div>
+        <div class="tilt-card" data-tilt style="position:relative;">
+          <div class="shot-frame">
+            <div class="fbar"><span></span><span></span><span></span></div>
+            <img src="https://aurora.growatiopex.com/sites/default/files/2026-09/digivox-select-interviewer.png" alt="DigiVox interview setup screen — select interviewer" loading="lazy">
+          </div>
+          <div class="float-tag" style="top:-4%; right:-8%;"><i></i>Rubric matched to role</div>
+          <div class="float-tag" style="bottom:-6%; left:-6%;"><i></i>Ready in under 2 min</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- voices -->
+    <section id="dv-voices">
+      <div class="wrap">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>02 · Interviewer personas</div>
+          <h2 class="h-title" style="font-size:clamp(26px,3.4vw,42px);">Four voices,<br>one standard.</h2>
+          <p class="lede" style="margin:18px 0 22px;">Every interviewer runs the same evaluation logic underneath — pick the tone that fits your candidates.</p>
+          <div class="persona-strip" id="personaStrip">
+            <div class="persona active" data-persona="0"><div class="av" style="background:linear-gradient(135deg,#ffb37a,#f2661c);">M</div><div class="meta"><b>Monika</b><span>Warm and thorough · Accent: Indian</span></div></div>
+            <div class="persona" data-persona="1"><div class="av" style="background:linear-gradient(135deg,#8fd6ff,#3182ce);">A</div><div class="meta"><b>Akash</b><span>Listens for depth and connection · Accent: Indian</span></div></div>
+            <div class="persona" data-persona="2"><div class="av" style="background:linear-gradient(135deg,#ffe28f,#e2590f);">R</div><div class="meta"><b>Ryan</b><span>Direct and structured · Accent: US</span></div></div>
+            <div class="persona" data-persona="3"><div class="av" style="background:linear-gradient(135deg,#c9b6ff,#7c5cff);">J</div><div class="meta"><b>Jane</b><span>Calm and encouraging · Accent: US</span></div></div>
+          </div>
+        </div>
+        <div class="tilt-card" data-tilt style="position:relative;">
+          <div class="peek-shot" style="display:none;"></div>
+          <div class="shot-frame">
+            <div class="fbar"><span></span><span></span><span></span></div>
+            <img src="https://aurora.growatiopex.com/sites/default/files/2026-09/digivox-voice.png" alt="DigiVox interviewer voice settings screenshot" loading="lazy">
+          </div>
+          <div class="tuner" style="border:0; border-top:1px solid var(--line); border-radius:0 0 20px 20px; margin-top:-2px;">
+            <p style="margin-bottom:16px; font-size:13px; color:var(--text-dim);">Try it — tune how <span id="tunerName">Monika</span> runs the conversation.</p>
+            <div class="slider-row"><div class="top"><b>Empathy</b><span class="val" id="vEmp">0.9</span></div><input type="range" min="0" max="1" step="0.1" value="0.9" data-eq></div>
+            <div class="slider-row"><div class="top"><b>Exploration</b><span class="val" id="vExp">0.7</span></div><input type="range" min="0" max="1" step="0.1" value="0.7" data-eq></div>
+            <div class="slider-row"><div class="top"><b>Rapport</b><span class="val" id="vRap">0.7</span></div><input type="range" min="0" max="1" step="0.1" value="0.7" data-eq></div>
+            <div class="slider-row" style="margin-bottom:0;"><div class="top"><b>Speed</b><span class="val" id="vSpd">0.5</span></div><input type="range" min="0" max="1" step="0.1" value="0.5" data-eq></div>
+            <div class="eq" id="eqBars"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- scoring -->
+    <section id="dv-scoring">
+      <div class="wrap">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>03 · Assessment &amp; scoring</div>
+          <h2 class="h-title" style="font-size:clamp(26px,3.4vw,42px);">A scorecard for<br>every conversation.</h2>
+          <p class="lede" style="margin:18px 0 26px;">Every response is scored against a consistent rubric — communication, level, and overall fit — with a plain-English summary and a transparent, auditable breakdown behind every number.</p>
+          <div class="ring-grid">
+            <div class="ring-card"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" stroke="var(--line)" stroke-width="4" fill="none"/><circle class="ring" data-pct="70" cx="20" cy="20" r="16" stroke="var(--ember)" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" transform="rotate(-90 20 20)"/></svg><b>Overall score</b><span class="num" data-num="70">0</span></div>
+            <div class="ring-card"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" stroke="var(--line)" stroke-width="4" fill="none"/><circle class="ring" data-pct="58" cx="20" cy="20" r="16" stroke="var(--scan)" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" transform="rotate(-90 20 20)"/></svg><b>Communication</b><span class="num" data-num="58">0</span></div>
+          </div>
+          <div class="level-tags"><span class="tag b1">Level B1</span><span class="tag b2">Level B2</span><span class="tag status">Potential</span></div>
+        </div>
+        <div class="tilt-card" data-tilt data-anim style="position:relative;">
+          <div class="shot-frame">
+            <div class="fbar"><span></span><span></span><span></span></div>
+            <img src="https://aurora.growatiopex.com/sites/default/files/2026-09/digivox-trainer.png" alt="DigiVox trainer screen — candidate scorecards" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- platform -->
+    <section id="dv-platform">
+      <div class="wrap" style="display:block;">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>The platform</div>
+          <h2 class="h-title">Everything a hiring<br>funnel needs, tied together.</h2>
+        </div>
+        <div class="cap-grid" data-anim>
+          <div class="cap-card"><span class="cap-num">01</span><h3>Automation &amp; delivery</h3><p>Automated scheduling, AI question generation, and 24/7 live or async video interviews handle all the logistics.</p></div>
+          <div class="cap-card"><span class="cap-num">02</span><h3>Assessment &amp; scoring</h3><p>AI-driven scoring and NLP analysis of answers, plus behavioral and psychometric signal for objective fit.</p></div>
+          <div class="cap-card"><span class="cap-num">03</span><h3>Intelligence &amp; reporting</h3><p>Real-time summaries, interviewer coaching, predictive hiring guidance, and funnel health analytics.</p></div>
+          <div class="cap-card"><span class="cap-num">04</span><h3>Compliance &amp; workflow</h3><p>Bias mitigation, smart proctoring and fraud detection, and seamless ATS/HRIS integration.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- results -->
+    <section id="dv-results">
+      <div class="wrap" style="display:block;">
+        <div data-anim>
+          <div class="eyebrow ember"><i></i>Benefits we're already seeing</div>
+          <h2 class="h-title">Fairer, faster, and<br>easier to defend.</h2>
+        </div>
+        <div class="benefit-grid" data-anim>
+          <div class="benefit">
+            <div class="ico">
+              <!-- Balance / fairness scale -->
+              <svg viewBox="0 0 24 24"><path d="M12 3v18M5 7l7-4 7 4"/><path d="M5 7l-3 6c0 1.657 1.343 3 3 3s3-1.343 3-3L5 7z"/><path d="M19 7l-3 6c0 1.657 1.343 3 3 3s3-1.343 3-3L19 7z"/><line x1="7" y1="21" x2="17" y2="21"/></svg>
+            </div>
+            <b>Reduced bias</b><span>Fairer hiring through anonymized, unstructured evaluations.</span>
+          </div>
+          <div class="benefit">
+            <div class="ico">
+              <!-- Consistent checkmark circle -->
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></svg>
+            </div>
+            <b>High consistency</b><span>Standardized questions and real-time coaching for every interviewer.</span>
+          </div>
+          <div class="benefit">
+            <div class="ico">
+              <!-- Lightning bolt / speed -->
+              <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <b>Faster time-to-hire</b><span>Automated scheduling and ranking dramatically accelerate the funnel.</span>
+          </div>
+          <div class="benefit">
+            <div class="ico">
+              <!-- Brain / insight -->
+              <svg viewBox="0 0 24 24"><path d="M9.5 2a5.5 5.5 0 0 0-5 7.78A5 5 0 0 0 7 19.5h10a5 5 0 0 0 2.5-9.72A5.5 5.5 0 0 0 14.5 2a5.46 5.46 0 0 0-2.5.6A5.46 5.46 0 0 0 9.5 2z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <b>Deeper insights</b><span>Behavioral, psychometric, and predictive analytics inform better decisions.</span>
+          </div>
+          <div class="benefit">
+            <div class="ico">
+              <!-- Shield with tick / compliance -->
+              <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6c0 5.25 3.5 10.15 8 11.35C16.5 21.15 20 16.25 20 11V5L12 2z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+            <b>Compliance &amp; XAI</b><span>Transparent scoring and smart proctoring keep trust and security intact.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- digivox cta -->
+    <section class="dv-cta">
+      <div class="wrap" data-anim>
+        <div class="eyebrow ember" style="justify-content:center;"><i></i>Ready when you are</div>
+        <h2>Bring DigiVox to your hiring team.</h2>
+        <div class="hero-cta">
+          <a class="btn btn-ember" href="mailto:hello@iopex.com">Talk to us</a>
+          <a class="btn btn-ghost" href="#products">Back to all products</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  <!-- ================= /DIGIVOX PRODUCT ZONE ================= -->
+
+  <footer>
+    <div class="wrap">
+      <div class="foot-row">
+        <div>
+          <div class="brand" style="margin-bottom:10px;">
+            <img class="brand-logo" id="brandLogoFoot" src="" alt="iOPEX Technologies">
+          </div>
+          <div class="foot-meta">© 2026 All rights reserved. iOPEX Technologies — Powered by CIO Team.</div>
+        </div>
+        <div class="foot-links">
+          <a href="#products" data-hover>Products</a>
+          <a href="#digivox" data-hover>DigiVox</a>
+          <a href="#" data-hover>Security</a>
+          <a href="mailto:hello@iopex.com" data-hover>Contact</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var isFine = window.matchMedia('(hover:hover) and (pointer:fine)').matches && window.innerWidth > 900;
+  var root = document.documentElement;
+  if(isFine) root.classList.add('fine');
+
+  /* logo */
+  var LOGO = {
+    light:'https://www.growatiopex.com/assets/img/brand/logos/horizontal/svg/horizontal-orange.svg',
+    dark:'https://www.growatiopex.com/assets/img/brand/logos/horizontal/svg/horizontal-white.svg'
+  };
+  var DV_LOGO = {
+    light:'https://aurora.growatiopex.com/sites/default/files/2026-09/Digivox-logo-dark_updated%20%281%29.png',
+    dark:'https://aurora.growatiopex.com/sites/default/files/2026-09/Digivox-logo-white_updated%20%282%29.png'
+  };
+  var logoEls = [document.getElementById('brandLogo'), document.getElementById('brandLogoFoot')];
+  var dvLogoEls = [document.getElementById('dvLogo'), document.getElementById('dvLogoCard')];
+  function syncLogo(){
+    var theme = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    logoEls.forEach(function(el){ if(el) el.src = LOGO[theme]; });
+    dvLogoEls.forEach(function(el){ if(el) el.src = DV_LOGO[theme]; });
+  }
+  syncLogo();
+
+  /* theme */
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    var cur = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', cur==='dark' ? 'light' : 'dark');
+    syncLogo();
+  });
+
+  /* cursor */
+  (function(){
+    var dot=document.querySelector('.cur-dot'), ring=document.querySelector('.cur-ring');
+    // Longer ease than the mouse ring: a pointer that teleports across the
+    // viewport is impossible to follow, and the travel is itself the cue that
+    // tells the client where to look next.
+    var xTo=gsap.quickTo(dot,"x",{duration:.08}), yTo=gsap.quickTo(dot,"y",{duration:.08});
+    var xToR=gsap.quickTo(ring,"x",{duration:.32}), yToR=gsap.quickTo(ring,"y",{duration:.32});
+    var gx=gsap.quickTo(dot,"x",{duration:.7,ease:"power3.out"}), gy=gsap.quickTo(dot,"y",{duration:.7,ease:"power3.out"});
+    var gxR=gsap.quickTo(ring,"x",{duration:.9,ease:"power3.out"}), gyR=gsap.quickTo(ring,"y",{duration:.9,ease:"power3.out"});
+
+    if(isFine){
+      window.addEventListener('mousemove', function(e){
+        // A real mouse always wins: the moment the presenter moves it, hand the
+        // ring back rather than fighting the agent for it.
+        release();
+        xTo(e.clientX); yTo(e.clientY); xToR(e.clientX); yToR(e.clientY);
+      });
+      document.querySelectorAll('[data-hover], a, button, .frame, .persona, .p-card').forEach(function(el){
+        var isEmber = el.closest('#digivox') !== null;
+        el.addEventListener('mouseenter', function(){ ring.classList.add('big'); if(isEmber) ring.classList.add('ember'); });
+        el.addEventListener('mouseleave', function(){ ring.classList.remove('big'); ring.classList.remove('ember'); });
+      });
+    }
+
+    /* ---- pointer under the voice agent's control -------------------------- */
+
+    var target=null, raf=0;
+
+    // The agent points at things while the page is still smooth-scrolling to
+    // them, so the element's viewport position keeps changing after the call.
+    // Tracking per frame is what keeps the ring on the target instead of
+    // stranding it where the element used to be.
+    function track(){
+      if(!target){ raf=0; return; }
+      if(!target.isConnected){ release(); return; }
+      var b=target.getBoundingClientRect();
+      gx(b.left+b.width/2); gy(b.top+b.height/2);
+      gxR(b.left+b.width/2); gyR(b.top+b.height/2);
+      raf=requestAnimationFrame(track);
+    }
+
+    function pointAt(el){
+      if(typeof el==='string') el=document.querySelector(el);
+      if(!el) return false;
+      target=el;
+      // A ring parked outside the viewport points at nothing. Most callers have
+      // already scrolled, so only scroll when the target genuinely is not in
+      // view — otherwise this fights the caller's own scroll.
+      var b=el.getBoundingClientRect();
+      if(b.bottom < 40 || b.top > window.innerHeight - 40){
+        el.scrollIntoView({ behavior: isFine ? 'smooth' : 'auto', block:'center' });
+      }
+      ring.classList.add('guided'); dot.classList.add('guided');
+      ring.classList.remove('big','ember');
+      if(!raf) raf=requestAnimationFrame(track);
+      return true;
+    }
+
+    function release(){
+      if(!target && !ring.classList.contains('guided')) return;
+      target=null;
+      if(raf){ cancelAnimationFrame(raf); raf=0; }
+      ring.classList.remove('guided','grabbing'); dot.classList.remove('guided');
+    }
+
+    // Free coordinates rather than an element, for the gesture layer: a hand
+    // points at a place on screen, not at a DOM node. Cancels element tracking
+    // so the two pointer sources cannot fight over the ring.
+    function moveTo(x, y, opts){
+      target=null;
+      if(raf){ cancelAnimationFrame(raf); raf=0; }
+      ring.classList.add('guided'); dot.classList.add('guided');
+      ring.classList.remove('big','ember');
+      ring.classList.toggle('grabbing', !!(opts && opts.active));
+      gx(x); gy(y); gxR(x); gyR(y);
+    }
+
+    window.IOPEX_CURSOR = { pointAt:pointAt, moveTo:moveTo, release:release,
+      isGuided:function(){ return !!target || ring.classList.contains('guided'); } };
+  })();
+
+  /* tilt */
+  if(isFine){
+    document.querySelectorAll('[data-tilt]').forEach(function(el){
+      var rotX = gsap.quickTo(el, "rotationX", {duration:.5, ease:"power3"});
+      var rotY = gsap.quickTo(el, "rotationY", {duration:.5, ease:"power3"});
+      el.style.transformPerspective = 1000;
+      el.addEventListener('mousemove', function(e){
+        var r = el.getBoundingClientRect();
+        var px = (e.clientX - r.left) / r.width - .5;
+        var py = (e.clientY - r.top) / r.height - .5;
+        rotY(px * 14); rotX(py * -14);
+      });
+      el.addEventListener('mouseleave', function(){ rotX(0); rotY(0); });
+    });
+  }
+
+  /* scroll reveal */
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en,i){
+      if(en.isIntersecting){
+        setTimeout(function(){ en.target.classList.add('in'); }, i*60);
+        io.unobserve(en.target);
+      }
+    });
+  }, {threshold:.2});
+  document.querySelectorAll('[data-anim]').forEach(function(el){ io.observe(el); });
+
+  /* counters */
+  function animateCount(el){
+    var target = parseFloat(el.getAttribute('data-count'));
+    var suffix = el.getAttribute('data-suffix') || '';
+    var obj = {v:0};
+    gsap.to(obj, {v:target, duration:1.6, ease:"power2.out", onUpdate:function(){ el.textContent = Math.round(obj.v) + suffix; }});
+  }
+  var countIO = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ if(en.isIntersecting){ animateCount(en.target); countIO.unobserve(en.target); } });
+  }, {threshold:.6});
+  document.querySelectorAll('[data-count]').forEach(function(el){ countIO.observe(el); });
+
+  /* scoring rings */
+  function animateRings(scope){
+    scope.querySelectorAll('.ring').forEach(function(c){
+      var pct = parseFloat(c.getAttribute('data-pct'));
+      var len = 100.5;
+      gsap.to(c, {strokeDashoffset: len - (len*pct/100), duration:1.4, ease:"power2.out"});
+    });
+    scope.querySelectorAll('.num').forEach(function(n){
+      var t = parseFloat(n.getAttribute('data-num'));
+      var o = {v:0};
+      gsap.to(o, {v:t, duration:1.3, ease:"power2.out", onUpdate:function(){ n.textContent = Math.round(o.v); }});
+    });
+  }
+  var ringIO = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ if(en.isIntersecting){ animateRings(en.target); ringIO.unobserve(en.target); } });
+  }, {threshold:.4});
+  document.querySelectorAll('.ring-grid').forEach(function(el){ ringIO.observe(el); });
+
+  /* -------- KINETIC GRID (interactive hero background) -------- */
+  (function(){
+    var heroEl = document.querySelector('.hero');
+    var canvas = document.getElementById('kinetic');
+    var ctx = canvas.getContext('2d');
+
+    var CELL_SIZE = 52, INFLUENCE_RADIUS = 240, MAX_WARP = 20, DOT_SPACING = 30, LERP_SPEED = 0.08;
+    var mouse = {x:-9999,y:-9999}, targetMouse = {x:-9999,y:-9999};
+    var ripples = [];
+    var size = {w:0,h:0};
+    var heroTop = 0;
+
+    function lerpN(a,b,t){ return a + (b-a)*t; }
+    function lerpColor(base, active, t){
+      var r = Math.round(lerpN(base.r, active.r, t));
+      var g = Math.round(lerpN(base.g, active.g, t));
+      var b = Math.round(lerpN(base.b, active.b, t));
+      var a = lerpN(base.a, active.a, t);
+      return 'rgba('+r+','+g+','+b+','+a.toFixed(3)+')';
+    }
+
+    function setSize(){
+      var rect = heroEl.getBoundingClientRect();
+      canvas.width = rect.width; canvas.height = rect.height;
+      size.w = rect.width; size.h = rect.height;
+      heroTop = rect.top + window.scrollY;
+    }
+    window.addEventListener('resize', setSize);
+    setSize();
+
+    window.addEventListener('mousemove', function(e){
+      var rect = heroEl.getBoundingClientRect();
+      var lx = e.clientX - rect.left, ly = e.clientY - rect.top;
+      if(ly < -100 || ly > rect.height + 100){ targetMouse.x = -9999; targetMouse.y = -9999; }
+      else { targetMouse.x = lx; targetMouse.y = ly; }
+    });
+    window.addEventListener('click', function(e){
+      var rect = heroEl.getBoundingClientRect();
+      if(e.clientY < rect.top || e.clientY > rect.bottom) return;
+      ripples.push({x:e.clientX-rect.left, y:e.clientY-rect.top, radius:0, opacity:1, born:performance.now()});
+    });
+
+    function getWarpedPoint(gx, gy, col, row, cols, rows){
+      var edgeMargin = 1.5;
+      var colPin = Math.min(col/edgeMargin, (cols-1-col)/edgeMargin, 1);
+      var rowPin = Math.min(row/edgeMargin, (rows-1-row)/edgeMargin, 1);
+      var pinFactor = colPin*colPin*rowPin*rowPin;
+
+      var dx = gx - mouse.x, dy = gy - mouse.y;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      var proximity = Math.max(0, 1 - dist/INFLUENCE_RADIUS) * pinFactor;
+
+      var rx=0, ry=0;
+      for(var i=0;i<ripples.length;i++){
+        var r = ripples[i];
+        var rdx = gx - r.x, rdy = gy - r.y;
+        var rdist = Math.sqrt(rdx*rdx + rdy*rdy);
+        var waveWidth = 55;
+        var diff = rdist - r.radius;
+        if(Math.abs(diff) < waveWidth){
+          var strength = (1 - Math.abs(diff)/waveWidth) * r.opacity * 16 * pinFactor;
+          var angle = Math.atan2(rdy, rdx);
+          var sign = diff < 0 ? -1 : 1;
+          rx += Math.cos(angle) * strength * sign * -1;
+          ry += Math.sin(angle) * strength * sign * -1;
+        }
+      }
+
+      if(dist < INFLUENCE_RADIUS && dist > 0 && pinFactor > 0){
+        var t = dist / INFLUENCE_RADIUS;
+        var eased = t < 0.01 ? 0 : (1-t)*(1-t)*Math.min(1, dist/60);
+        var warpAmt = eased * MAX_WARP * pinFactor;
+        var ang = Math.atan2(dy, dx);
+        return {pt:{x: gx - Math.cos(ang)*warpAmt + rx, y: gy - Math.sin(ang)*warpAmt + ry}, proximity:proximity};
+      }
+      return {pt:{x:gx+rx, y:gy+ry}, proximity:proximity};
+    }
+
+    function draw(now){
+      var W = size.w, H = size.h;
+      if(!W || !H) return;
+      var isLight = root.getAttribute('data-theme') === 'light';
+      var lineBase = isLight ? {r:20,g:16,b:10,a:.04} : {r:255,g:255,b:255,a:.07};
+      var dotColor = isLight ? 'rgba(20,16,10,0.06)' : 'rgba(255,255,255,0.05)';
+      var lineActive = {r:242,g:102,b:28,a:.28};
+      var nodeActive = {r:255,g:200,b:69,a:1};
+      var glow = '242,102,28';
+      var rippleColor = '255,200,69';
+
+      ctx.clearRect(0,0,W,H);
+
+      ctx.fillStyle = dotColor;
+      for(var x = DOT_SPACING/2; x < W; x += DOT_SPACING){
+        for(var y = DOT_SPACING/2; y < H; y += DOT_SPACING){
+          ctx.beginPath(); ctx.arc(x,y,0.7,0,Math.PI*2); ctx.fill();
+        }
+      }
+
+      for(var i=ripples.length-1;i>=0;i--){
+        var r = ripples[i];
+        var age = (now - r.born)/1000;
+        r.radius = Math.max(0, age*380);
+        r.opacity = Math.max(0, 1 - age*1.2);
+        if(r.opacity <= 0) ripples.splice(i,1);
+      }
+
+      var cols = Math.max(2, Math.ceil(W/CELL_SIZE)) + 1;
+      var rows = Math.max(2, Math.ceil(H/CELL_SIZE)) + 1;
+      var cellW = W/(cols-1), cellH = H/(rows-1);
+
+      var pts = [], prox = [];
+      for(var row=0; row<rows; row++){
+        pts[row]=[]; prox[row]=[];
+        for(var col=0; col<cols; col++){
+          var res = getWarpedPoint(col*cellW, row*cellH, col, row, cols, rows);
+          pts[row][col] = res.pt; prox[row][col] = res.proximity;
+        }
+      }
+
+      function drawSeg(p1,p2,pr1,pr2){
+        var avg = (pr1+pr2)/2;
+        var t = avg*avg*(3-2*avg);
+        ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+        ctx.strokeStyle = lerpColor(lineBase, lineActive, t);
+        ctx.lineWidth = lerpN(0.8,1.5,t);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      for(var row=0; row<rows; row++) for(var col=0; col<cols-1; col++) drawSeg(pts[row][col], pts[row][col+1], prox[row][col], prox[row][col+1]);
+      for(var col=0; col<cols; col++) for(var row=0; row<rows-1; row++) drawSeg(pts[row][col], pts[row+1][col], prox[row][col], prox[row+1][col]);
+
+      for(var row=0; row<rows; row++){
+        for(var col=0; col<cols; col++){
+          var p = pts[row][col], pr = prox[row][col];
+          var t = pr*pr*(3-2*pr);
+          var rad = lerpN(1.8, 3.2, t);
+          if(t > 0.3){
+            var glowR = rad + lerpN(0,6,(t-0.3)/0.7);
+            var grd = ctx.createRadialGradient(p.x,p.y,rad*0.5,p.x,p.y,glowR);
+            grd.addColorStop(0, 'rgba('+glow+','+(t*0.3).toFixed(3)+')');
+            grd.addColorStop(1, 'rgba('+glow+',0)');
+            ctx.beginPath(); ctx.arc(p.x,p.y,glowR,0,Math.PI*2); ctx.fillStyle = grd; ctx.fill();
+          }
+          ctx.beginPath(); ctx.arc(p.x,p.y,rad,0,Math.PI*2);
+          ctx.fillStyle = lerpColor({r:255,g:255,b:255,a:isLight?0.5:0.2}, nodeActive, t);
+          ctx.fill();
+        }
+      }
+
+      for(var i2=0;i2<ripples.length;i2++){
+        var rr = ripples[i2];
+        var safeRadius = Math.max(0, rr.radius);
+        ctx.beginPath(); ctx.arc(rr.x, rr.y, safeRadius, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba('+rippleColor+','+(rr.opacity*0.28).toFixed(3)+')';
+        ctx.lineWidth = 1.5; ctx.stroke();
+      }
+    }
+
+    function animate(now){
+      mouse.x = lerpN(mouse.x, targetMouse.x, LERP_SPEED);
+      mouse.y = lerpN(mouse.y, targetMouse.y, LERP_SPEED);
+      draw(now);
+      if(!reduce) requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+    if(reduce){ setTimeout(function(){ draw(0); }, 50); }
+  })();
+
+  /* -------- PRODUCTS SPOTLIGHT CAROUSEL (hero) -------- */
+  var slidesData = [
+    { title:'DigiVox', desc:'AI interview and proctoring platform — live today.',
+      img:'https://aurora.growatiopex.com/sites/default/files/2026-09/digivox-homescreen.png', live:true, href:'#digivox', cta:'Explore the DigiVox product tour' },
+    { title:'DigiAura', desc:'The next product in the iOPEX suite — screens coming soon.',
+      img:'https://aurora.growatiopex.com/sites/default/files/2026-09/digiaura.png', live:false, cta:'Coming soon' },
+    { title:'DigiCoach', desc:'AI coaching and development platform — coming soon.',
+      img:'https://aurora.growatiopex.com/sites/default/files/2026-09/267a76ca-a13b-494c-9348-638cc21d0e0f.png', live:false, cta:'Coming soon' }
+  ];
+
+  var stage = document.getElementById('stage');
+  var dotsWrap = document.getElementById('carDots');
+  var capTitle = document.getElementById('capTitle');
+  var capDesc = document.getElementById('capDesc');
+  var stageCtaBtn = document.getElementById('stageCtaBtn');
+  var N = slidesData.length;
+  var current = 0;
+  var frames = [];
+
+  slidesData.forEach(function(s, i){
+    var f = document.createElement('div');
+    f.className = 'frame';
+    var body = s.img
+      ? '<img src="'+s.img+'" alt="'+s.title+' screenshot" loading="lazy">'
+      : '<div class="fplaceholder"><b>'+s.title+'</b><span class="badge">Screenshot coming soon</span></div>';
+    f.innerHTML = (s.live ? '<div class="live-pill"><span class="d"></span>Live</div>' : '') +
+      '<div class="fbar"><span></span><span></span><span></span></div>' + body;
+    f.addEventListener('click', function(){
+      var diff = signedDiff(i, current);
+      if(diff === 0){ if(s.href){ document.getElementById(s.href.slice(1)).scrollIntoView({behavior:'smooth'}); } }
+      else{ setCurrent(i); }
+    });
+    stage.appendChild(f);
+    frames.push(f);
+
+    var d = document.createElement('button');
+    d.addEventListener('click', function(){ setCurrent(i); });
+    dotsWrap.appendChild(d);
+  });
+
+  function signedDiff(i, cur){
+    var diff = i - cur;
+    if(diff > N/2) diff -= N;
+    if(diff < -N/2) diff += N;
+    return diff;
+  }
+
+  function layout(){
+    frames.forEach(function(f, i){
+      var diff = signedDiff(i, current);
+      var props;
+      if(diff === 0) props = {x:'0%', rotationY:0, scale:1, opacity:1, zIndex:5};
+      else if(diff === 1) props = {x:'46%', rotationY:-24, scale:.82, opacity:.5, zIndex:3};
+      else if(diff === -1) props = {x:'-46%', rotationY:24, scale:.82, opacity:.5, zIndex:3};
+      else props = {x: diff>0 ? '95%' : '-95%', rotationY:0, scale:.7, opacity:0, zIndex:1};
+      gsap.to(f, {x:props.x, rotationY:props.rotationY, scale:props.scale, opacity:props.opacity, zIndex:props.zIndex, duration:.7, ease:'power3.out', pointerEvents: (diff===0||Math.abs(diff)===1) ? 'auto':'none'});
+    });
+    dotsWrap.querySelectorAll('button').forEach(function(b,i){ b.classList.toggle('active', i===current); });
+    var d = slidesData[current];
+    gsap.fromTo([capTitle, capDesc], {opacity:0, y:8}, {opacity:1, y:0, duration:.4, stagger:.05});
+    capTitle.innerHTML = d.title; capDesc.textContent = d.desc;
+    stageCtaBtn.textContent = d.cta;
+    if(d.live){ stageCtaBtn.href = d.href; stageCtaBtn.classList.remove('btn-disabled'); stageCtaBtn.classList.add('btn-ember'); stageCtaBtn.style.pointerEvents = 'auto'; stageCtaBtn.style.opacity = 1; }
+    else{ stageCtaBtn.removeAttribute('href'); stageCtaBtn.classList.remove('btn-ember'); stageCtaBtn.classList.add('btn-disabled'); stageCtaBtn.style.pointerEvents = 'none'; stageCtaBtn.style.opacity = .7; }
+  }
+
+  function setCurrent(i){ current = ((i % N) + N) % N; layout(); }
+  layout();
+
+  var autoplay = setInterval(function(){ if(!reduce) setCurrent(current+1); }, 4200);
+  function pauseAuto(){ clearInterval(autoplay); }
+  function resumeAuto(){ autoplay = setInterval(function(){ if(!reduce) setCurrent(current+1); }, 4200); }
+  var stageWrap = document.querySelector('.stage-wrap');
+  var isHovering = false;
+  stageWrap.addEventListener('mouseenter', function(){ isHovering = true; pauseAuto(); });
+  stageWrap.addEventListener('mouseleave', function(){ isHovering = false; resumeAuto(); });
+
+  /* ---- drag-to-slide (touch + mouse) with grab cursor ---- */
+  var dragState = { active:false, isTouch:false, startX:0, startY:0, dx:0, moved:false, lastX:0, lastT:0, velocity:0 };
+  var DRAG_THRESHOLD  = 6;    /* px before we lock as horizontal drag */
+  var SWIPE_COMMIT_MOUSE = 55;  /* px to commit a slide change (mouse) */
+  var SWIPE_COMMIT_TOUCH = 26;  /* px to commit a slide change (touch) — much easier to trigger */
+  var FLICK_VELOCITY  = 0.45; /* px/ms — a quick short flick commits even under the distance threshold */
+
+  /* cursor */
+  stage.style.cursor = 'grab';
+  stage.style.touchAction = 'pan-y'; /* allow vertical scroll, intercept horizontal */
+  stage.style.userSelect = 'none';
+
+  function dragStart(clientX, clientY, isTouch){
+    dragState.active = true;
+    dragState.isTouch = !!isTouch;
+    dragState.startX = clientX;
+    dragState.startY = clientY;
+    dragState.dx = 0;
+    dragState.moved = false;
+    dragState.lastX = clientX;
+    dragState.lastT = performance.now();
+    dragState.velocity = 0;
+    stage.style.cursor = 'grabbing';
+    pauseAuto();
+  }
+  function dragMove(clientX, clientY){
+    if(!dragState.active) return;
+    var dx = clientX - dragState.startX;
+    var dy = clientY - dragState.startY;
+    if(!dragState.moved && Math.abs(dx) < DRAG_THRESHOLD) return; /* not yet dragging */
+    if(!dragState.moved && Math.abs(dy) > Math.abs(dx)){ dragState.active = false; return; } /* vertical scroll — bail */
+    dragState.moved = true;
+    dragState.dx = dx;
+    /* track instantaneous velocity for flick detection */
+    var now = performance.now();
+    var dt = now - dragState.lastT;
+    if(dt > 0){ dragState.velocity = (clientX - dragState.lastX) / dt; }
+    dragState.lastX = clientX;
+    dragState.lastT = now;
+    /* live rubber-band: nudge center frame slightly with drag (touch gets a bit more feedback) */
+    var range = dragState.isTouch ? 55 : 40;
+    var mult  = dragState.isTouch ? 0.09 : 0.06;
+    var pct = Math.max(-range, Math.min(range, dx * mult));
+    if(frames[current]) gsap.to(frames[current], {x: pct+'%', duration:.1, overwrite:'auto'});
+  }
+  function dragEnd(){
+    if(!dragState.active) return;
+    dragState.active = false;
+    stage.style.cursor = 'grab';
+    /* snap center frame back */
+    if(frames[current]) gsap.to(frames[current], {x:'0%', duration:.35, ease:'power2.out', overwrite:'auto'});
+    if(dragState.moved){
+      var commit = dragState.isTouch ? SWIPE_COMMIT_TOUCH : SWIPE_COMMIT_MOUSE;
+      var flick = Math.abs(dragState.velocity) > FLICK_VELOCITY;
+      if(dragState.dx < -commit || (flick && dragState.dx < 0)) setCurrent(current + 1);
+      else if(dragState.dx > commit || (flick && dragState.dx > 0)) setCurrent(current - 1);
+    }
+    if(!isHovering) resumeAuto();
+  }
+
+  /* mouse */
+  stage.addEventListener('mousedown', function(e){ dragStart(e.clientX, e.clientY, false); });
+  window.addEventListener('mousemove', function(e){ dragMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', dragEnd);
+
+  /* touch */
+  stage.addEventListener('touchstart', function(e){ dragStart(e.touches[0].clientX, e.touches[0].clientY, true); }, {passive:true});
+  stage.addEventListener('touchmove', function(e){
+    if(!dragState.active) return;
+    dragMove(e.touches[0].clientX, e.touches[0].clientY);
+    if(dragState.moved) e.preventDefault(); /* stop page scrolling once horizontal drag is confirmed */
+  }, {passive:false});
+  stage.addEventListener('touchend', function(e){ dragEnd(); }, {passive:true});
+  stage.addEventListener('touchcancel', function(){ dragEnd(); }, {passive:true});
+
+  /* -------- EQ + PERSONA TUNER (DigiVox voices section) -------- */
+  var eqBars = document.getElementById('eqBars');
+  var bars = [];
+  for(var j=0;j<24;j++){ var b=document.createElement('span'); b.style.height='6px'; eqBars.appendChild(b); bars.push(b); }
+  var sliders = document.querySelectorAll('[data-eq]');
+  var valEls = [document.getElementById('vEmp'),document.getElementById('vExp'),document.getElementById('vRap'),document.getElementById('vSpd')];
+  function renderEq(){
+    var vals = Array.prototype.map.call(sliders, function(s){ return parseFloat(s.value); });
+    var avg = (vals[0]+vals[1]+vals[2]+vals[3])/4;
+    bars.forEach(function(bar,i){
+      var wobble = Math.abs(Math.sin((i/24)*Math.PI*2 + avg*6)) * (30+ avg*70);
+      bar.style.height = (6+wobble) + 'px';
+    });
+  }
+  sliders.forEach(function(s,idx){
+    s.addEventListener('input', function(){ valEls[idx].textContent = parseFloat(s.value).toFixed(1); renderEq(); });
+  });
+  renderEq();
+  if(!reduce){ gsap.ticker.add(function(){ if(Math.random()<0.06) renderEq(); }); }
+
+  var personaData = [
+    {name:'Monika', vals:[0.9,0.7,0.7,0.5]},
+    {name:'Akash', vals:[1,0.7,0.7,0.5]},
+    {name:'Ryan', vals:[0.6,0.9,0.5,0.7]},
+    {name:'Jane', vals:[0.85,0.6,0.8,0.4]}
+  ];
+  document.querySelectorAll('.persona').forEach(function(p){
+    p.addEventListener('click', function(){
+      document.querySelectorAll('.persona').forEach(function(x){ x.classList.remove('active'); });
+      p.classList.add('active');
+      var d = personaData[+p.getAttribute('data-persona')];
+      document.getElementById('tunerName').textContent = d.name;
+      sliders.forEach(function(s,i){ s.value = d.vals[i]; valEls[i].textContent = d.vals[i].toFixed(1); });
+      renderEq();
+    });
+  });
+
+  /* -------- THREE.JS NEURAL BRAIN PARTICLES (DigiVox intro) -------- */
+  (function(){
+    var canvas = document.getElementById('orb');
+    var stage2 = canvas.parentElement;
+    var renderer, scene, camera, brainPoints, synapseLines, raf;
+    try{ renderer = new THREE.WebGLRenderer({canvas:canvas, alpha:true, antialias:true}); }
+    catch(e){ stage2.style.display='none'; return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.z = 5.4;
+
+    var c1 = new THREE.Color(0xf2661c), c2 = new THREE.Color(0xffc845), c3 = new THREE.Color(0x33d8c2);
+
+    /* --- build a brain-like point cloud ---
+       start from a sphere distribution, squash into two lobes with a central
+       fissure, then add gyri/sulci style noise bumps to the radius so the
+       cloud reads as an organic "AI brain" rather than a plain sphere. */
+    var COUNT = 5200;
+    var basePositions = new Float32Array(COUNT*3);
+    var positions = new Float32Array(COUNT*3);
+    var colors = new Float32Array(COUNT*3);
+    var seeds = new Float32Array(COUNT);
+
+    function noise3(x,y,z){
+      return Math.sin(x*2.1+y*1.3) * Math.cos(y*1.7+z*2.3) * Math.sin(z*1.9+x*1.1);
+    }
+
+    var R = 1.7;
+    for(var i=0;i<COUNT;i++){
+      /* fibonacci sphere for even distribution */
+      var k = i + 0.5;
+      var phi = Math.acos(1 - 2*k/COUNT);
+      var theta = Math.PI * (1 + Math.sqrt(5)) * k;
+      var sx = Math.sin(phi)*Math.cos(theta);
+      var sy = Math.cos(phi);
+      var sz = Math.sin(phi)*Math.sin(theta);
+
+      /* squash top/bottom slightly, taper front/back like a brain silhouette */
+      var yScale = 0.82 - Math.abs(sy)*0.06;
+      var zScale = 0.88 + sy*0.05;
+      var bx = sx * 1.0;
+      var by = sy * yScale;
+      var bz = sz * zScale * 0.86;
+
+      /* central longitudinal fissure — push points away from the mid-plane */
+      var fissure = Math.exp(-Math.pow(bx*7.5,2)) * 0.16;
+      bx += (bx >= 0 ? 1 : -1) * fissure;
+
+      /* gyri/sulci wrinkle noise on the surface radius */
+      var n = noise3(sx*3.2, sy*3.2, sz*3.2);
+      var wrinkle = 1 + n*0.09;
+
+      var px = bx * R * wrinkle;
+      var py = by * R * wrinkle;
+      var pz = bz * R * wrinkle;
+
+      basePositions[i*3]   = px;
+      basePositions[i*3+1] = py;
+      basePositions[i*3+2] = pz;
+      positions[i*3]   = px;
+      positions[i*3+1] = py;
+      positions[i*3+2] = pz;
+      seeds[i] = Math.random()*Math.PI*2;
+
+      var yy = (py/R + 0.9)/1.8;
+      var col = yy < 0.5 ? c1.clone().lerp(c2, yy*2) : c2.clone().lerp(c3, (yy-0.5)*2);
+      colors[i*3]=col.r; colors[i*3+1]=col.g; colors[i*3+2]=col.b;
+    }
+
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+    var ptsMat = new THREE.PointsMaterial({size:0.028, vertexColors:true, transparent:true, opacity:0.92, blending:THREE.AdditiveBlending, depthWrite:false});
+    brainPoints = new THREE.Points(geo, ptsMat);
+    scene.add(brainPoints);
+
+    /* --- sparse synapse connections between nearby points, firing at random --- */
+    var LINK_COUNT = 130;
+    var linkGeo = new THREE.BufferGeometry();
+    var linkPos = new Float32Array(LINK_COUNT*2*3);
+    var linkA = [], linkB = [], linkPhase = [];
+    for(var l=0; l<LINK_COUNT; l++){
+      var ia = Math.floor(Math.random()*COUNT);
+      var ib = Math.floor(Math.random()*COUNT);
+      var ax=basePositions[ia*3], ay=basePositions[ia*3+1], az=basePositions[ia*3+2];
+      var bxp=basePositions[ib*3], byp=basePositions[ib*3+1], bzp=basePositions[ib*3+2];
+      var d = Math.sqrt((ax-bxp)*(ax-bxp)+(ay-byp)*(ay-byp)+(az-bzp)*(az-bzp));
+      if(d > 0.55){ l--; continue; } /* only keep close neighbour pairs */
+      linkA.push(ia); linkB.push(ib); linkPhase.push(Math.random()*Math.PI*2);
+    }
+    linkGeo.setAttribute('position', new THREE.BufferAttribute(linkPos,3));
+    var linkMat = new THREE.LineBasicMaterial({color:0xffc845, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending});
+    synapseLines = new THREE.LineSegments(linkGeo, linkMat);
+    scene.add(synapseLines);
+
+    /* faint outer wireframe shell for depth */
+    var wireGeo = new THREE.IcosahedronGeometry(2.05, 1);
+    var wireMat = new THREE.MeshBasicMaterial({color:0xf2661c, wireframe:true, transparent:true, opacity:0.07});
+    var wire = new THREE.Mesh(wireGeo, wireMat);
+    scene.add(wire);
+
+    function resize(){
+      var w = stage2.clientWidth, h = stage2.clientHeight;
+      if(!w || !h) return;
+      renderer.setSize(w,h,false);
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    var mouse = {x:0,y:0};
+    window.addEventListener('mousemove', function(e){
+      mouse.x = (e.clientX/window.innerWidth - 0.5);
+      mouse.y = (e.clientY/window.innerHeight - 0.5);
+    });
+
+    var clock = new THREE.Clock();
+    var posAttr = geo.attributes.position;
+    var linkPosAttr = linkGeo.attributes.position;
+
+    function tick(){
+      raf = requestAnimationFrame(tick);
+      var t = clock.getElapsedTime();
+
+      /* gentle organic pulsing of the whole point cloud, like a live signal */
+      for(var i=0;i<COUNT;i++){
+        var s = seeds[i];
+        var pulse = 1 + Math.sin(t*1.4 + s)*0.012;
+        posAttr.array[i*3]   = basePositions[i*3]   * pulse;
+        posAttr.array[i*3+1] = basePositions[i*3+1] * pulse;
+        posAttr.array[i*3+2] = basePositions[i*3+2] * pulse;
+      }
+      posAttr.needsUpdate = true;
+
+      /* synapses fire in and out on independent phases */
+      for(var l=0;l<linkA.length;l++){
+        var ia = linkA[l], ib = linkB[l];
+        linkPosAttr.array[l*6]   = posAttr.array[ia*3];
+        linkPosAttr.array[l*6+1] = posAttr.array[ia*3+1];
+        linkPosAttr.array[l*6+2] = posAttr.array[ia*3+2];
+        linkPosAttr.array[l*6+3] = posAttr.array[ib*3];
+        linkPosAttr.array[l*6+4] = posAttr.array[ib*3+1];
+        linkPosAttr.array[l*6+5] = posAttr.array[ib*3+2];
+      }
+      linkPosAttr.needsUpdate = true;
+      var fire = (Math.sin(t*0.9)*0.5+0.5);
+      linkMat.opacity = 0.08 + fire*0.35;
+
+      brainPoints.rotation.y = t*0.14 + mouse.x*0.6;
+      brainPoints.rotation.x = mouse.y*0.35;
+      synapseLines.rotation.y = brainPoints.rotation.y;
+      synapseLines.rotation.x = brainPoints.rotation.x;
+      wire.rotation.y = -t*0.06;
+      wire.rotation.x = t*0.04;
+
+      camera.position.x += (mouse.x*0.9 - camera.position.x)*0.04;
+      camera.position.y += (-mouse.y*0.9 - camera.position.y)*0.04;
+      camera.lookAt(0,0,0);
+      renderer.render(scene, camera);
+    }
+    if(reduce){ renderer.render(scene,camera); } else { tick(); }
+  })();
+
+})();
+</script>
+<!-- Voice guide: ElevenLabs agent rendered as the animated orb (see agent/agent.md) -->
+<script>
+  // ── SET THE ELEVENLABS AGENT ID HERE ────────────────────────────────────────
+  // Public id from the ElevenLabs dashboard (Agents -> your agent -> address bar).
+  // Not a secret. Leave empty and the orb renders but cannot connect.
+  window.IOPEX_VOICE_AGENT_ID = 'agent_8601m25e1gmdft09d3vy3ft6bq94';
+  // The DigiAura architecture deck, for the openArchitecture tool and the card link.
+  window.IOPEX_ARCHITECTURE_URL = 'http://localhost:5173/';
+</script>
+<script type="module" src="voice-boot.js"></script>
+<!-- Gesture layer: MediaPipe hand tracking. Starts stopped; press "g" to arm. -->
+<script type="module" src="gesture-boot.js"></script>
+</body>
+</html>

@@ -1,0 +1,250 @@
+/* ================= REACT PORT ADDITIONS =================
+   Everything the original kiosk page did NOT ship inline: the gesture HUD
+   (camera preview, state, legend, hold ring, zoom badge) and the zoom target
+   transition. The voice guide injects its own palette-templated styles. */
+
+/* ---- gesture zoom target: smooth when a pinch releases / snaps back ---- */
+.k-slide > .wrap, #logo-carousel .lc-stage { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.k-slide > .wrap.is-zoomed { transition: none; }
+#logo-carousel .lc-stage.is-zoomed { transition: none; }
+/* while zoomed the slide must not clip its own enlarged content — the fixed
+   .k-viewport already clips at the screen edge */
+#digivox-view .k-slide:has(> .wrap.is-zoomed), #elevaite-view .k-slide:has(> .wrap.is-zoomed),
+#digikoach-view .k-slide:has(> .wrap.is-zoomed), #pexminer-view .k-slide:has(> .wrap.is-zoomed),
+#digiaura-view .k-slide:has(> .wrap.is-zoomed) { overflow: visible; }
+
+/* ---- gesture HUD ---- */
+.ghud {
+  position: fixed; left: 18px; bottom: 22px; z-index: 2147481500;
+  width: 224px; display: flex; flex-direction: column; gap: 8px;
+  padding: 8px; border-radius: 16px;
+  background: rgba(12,11,14,.82); border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 16px 50px rgba(0,0,0,.55);
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; color: var(--text-dim);
+  animation: ghud-in .4s var(--ease-entrance) both;
+}
+@keyframes ghud-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+.ghud-active { border-color: rgba(51,216,194,.35); box-shadow: 0 16px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(51,216,194,.12); }
+.ghud-error { border-color: rgba(255,107,107,.4); }
+
+.ghud-cam { position: relative; width: 208px; height: 156px; border-radius: 12px; overflow: hidden; background: #000; }
+.ghud-cam canvas { display: block; width: 100%; height: 100%; }
+.ghud-dot { position: absolute; top: 8px; left: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+.ghud-dot.active { background: #3ddc84; box-shadow: 0 0 0 3px rgba(61,220,132,.25); animation: pulse 1.8s infinite; }
+.ghud-dot.loading { background: var(--insight); animation: pulse 1s infinite; }
+.ghud-dot.error { background: #ff6b6b; }
+.ghud-wake {
+  position: absolute; inset: auto 8px 8px 8px; text-align: center;
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text);
+  background: rgba(10,10,16,.7); border-radius: 8px; padding: 6px 8px;
+  animation: ghud-breathe 2.2s ease-in-out infinite;
+}
+.ghud-wake.err { color: #ff8a8a; text-transform: none; letter-spacing: 0; animation: none; }
+@keyframes ghud-breathe { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+
+/* hold progress ring — centred over the camera, only visible mid-hold */
+.ghud-ring { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; transform: translate(-50%,-50%) rotate(-90deg); pointer-events: none; }
+.ghud-ring circle { fill: none; stroke-width: 4; }
+.ghud-ring-bg { stroke: rgba(255,255,255,.12); }
+.ghud-ring-fg { stroke: var(--gold); stroke-linecap: round; opacity: 0; transition: opacity .15s ease; filter: drop-shadow(0 0 6px rgba(255,200,69,.6)); }
+
+.ghud-zoom {
+  position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 100px;
+  background: rgba(51,216,194,.18); border: 1px solid rgba(51,216,194,.5); color: #9ff0e3;
+  font-size: 11px; font-weight: 600; transition: opacity .2s ease;
+}
+
+.ghud-state { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.ghud-phase { color: var(--text); }
+.ghud-active .ghud-phase { color: #7fe8d6; }
+.ghud-hands { color: var(--text-faint); }
+
+.ghud-legend { list-style: none; margin: 0; padding: 0 2px 2px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 6px; }
+.ghud-legend li {
+  display: flex; align-items: center; gap: 6px; font-size: 10px; line-height: 1.2; padding: 4px 6px; border-radius: 8px;
+  color: var(--text-faint); border: 1px solid transparent;
+  transition: background .2s ease, color .2s ease, border-color .2s ease, transform .2s var(--ease-hover);
+}
+.ghud-legend li.on { color: var(--text); background: rgba(255,200,69,.12); border-color: rgba(255,200,69,.45); transform: translateX(2px); }
+.ghud-legend li:last-child { grid-column: 1 / -1; }
+.ghud-ico { font-size: 13px; line-height: 1; filter: grayscale(.2); }
+.ghud-legend li.on .ghud-ico { filter: none; }
+
+.ghud-toast {
+  position: absolute; left: 50%; top: -14px; transform: translate(-50%, -100%);
+  padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+  background: rgba(16,16,19,.92); border: 1px solid rgba(255,200,69,.45); color: var(--text);
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  opacity: 0; transition: opacity .2s ease, transform .2s ease; pointer-events: none;
+}
+.ghud-toast.show { opacity: 1; transform: translate(-50%, calc(-100% - 4px)); }
+
+@media (max-width: 900px) { .ghud { display: none; } }
+
+/* The voice guide is a left rail now, not a bottom-centre pill, so it no
+   longer collides with the deck's bottom-right arrows. Its responsive layout
+   lives in the component's own stylesheet (voiceAgent.ts): that <style> is
+   injected inside .iopex-voice and therefore beats any same-specificity rule
+   here, so layout overrides in this file would silently do nothing. */
+
+/* ------------------------------------------------------ voice panel gutter --
+   The voice guide sits in the bottom-right corner, above the deck's chip and
+   arrow row. Reserve a column on the right so a slide never runs under it —
+   and only on the right, since that is the only side it occupies. Padding the
+   viewport (rather than shrinking .wrap symmetrically) keeps the slide centred
+   in the space that is actually left, instead of stranding an equal-sized dead
+   margin on the left where there is nothing to avoid.
+
+   --voice-gutter is the single knob; it collapses to 0 when the guide is
+   hidden (?voice=off, or the x on the panel). */
+:root { --voice-gutter: 196px; }
+@media (max-width: 1100px) { :root { --voice-gutter: 160px; } }
+@media (max-width: 760px)  { :root { --voice-gutter: 0px; } }
+html.voice-hidden         { --voice-gutter: 0px; }
+
+#digivox-view .k-viewport, #elevaite-view .k-viewport, #digikoach-view .k-viewport,
+#pexminer-view .k-viewport, #digiaura-view .k-viewport {
+  padding-right: var(--voice-gutter);
+}
+#digivox-view .wrap, #elevaite-view .wrap, #digikoach-view .wrap,
+#pexminer-view .wrap, #digiaura-view .wrap {
+  width: min(1320px, 92%);
+}
+@media (min-width: 2400px) {
+  /* A wall display has room to spare; keep the original generous width. */
+  #digivox-view .wrap, #elevaite-view .wrap, #digikoach-view .wrap,
+  #pexminer-view .wrap, #digiaura-view .wrap { width: min(1680px, 92%); }
+}
+
+/* The home carousel is a fixed, centred stage rather than a .wrap; nudge it
+   off the panel instead of resizing it. */
+@media (min-width: 761px) {
+  #logo-carousel .lc-stage { padding-right: var(--voice-gutter); }
+}
+html.voice-hidden #logo-carousel .lc-stage { padding-right: 0; }
+
+/* ================= UI TEAM UPDATES (iopex-experience, 2026-09-18) =================
+   Ported from the UI team's revised build of this page. Kept as one block, in
+   their order, so the two can be diffed. */
+
+/* Product-copy spacing: bullet marks sit in a fixed gutter so wrapped lines
+   align under the first, instead of the flex gap shifting per line. */
+.bullet-list li { display: block !important; position: relative; padding-left: 32px !important; gap: 0 !important; }
+.bullet-list li::before { position: absolute !important; left: 2px; top: .35em; margin-top: 0 !important; }
+
+/* Keep the standalone experience header focused on the iOPEX mark: no
+   "Experience" word-mark, no divider. The UI team's build also hid the
+   Manual/Gesture switch, but that build carried the old wave-to-wake gesture
+   layer; this one ships the presentation remote (thumbs-up select, 4-way
+   sweeps, live at once), and the switch is how the presenter turns the camera
+   on — so it stays. `g` still toggles it from the keyboard. */
+.brand-divider, .site-portal-name { display: none !important; }
+
+/* Match the product-page beam treatment on the active carousel product. */
+.lc-product-link.current {
+  position: relative; overflow: hidden; isolation: isolate;
+  background: rgba(255,255,255,.05); border-color: transparent; color: var(--text);
+}
+.lc-product-link.current::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1.5px;
+  background: conic-gradient(from var(--beam-angle), transparent 0%, transparent 68%, var(--ember) 80%, var(--gold) 90%, var(--scan) 96%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: beam-spin 3s linear infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-product-link.current::before { animation: none; background: var(--ember); }
+}
+
+/* iOPEX Guide: a quiet brand-orange border (20%, the same in every state — the
+   UI team toned the earlier bright ring down so the panel stops competing with
+   the slide) + a panel height that does not jump as the transcript line comes
+   and goes. */
+.iopex-voice { border-color: rgba(254,94,0,.2) !important; }
+.iopex-voice.is-live, .iopex-voice.is-revealed { border-color: rgba(254,94,0,.2) !important; }
+.iopex-voice.is-speaking, .iopex-voice.is-connecting, .iopex-voice.is-listening { border-color: rgba(254,94,0,.2) !important; }
+.iopex-voice .vhint { min-height: 4.05em !important; display: -webkit-box !important; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.iopex-voice:not(.is-live) .vhint { display: none !important; }
+.iopex-voice .vhint:empty { display: -webkit-box !important; }
+.iopex-voice:not(.is-live) .vhint:empty { display: none !important; }
+.iopex-voice .vstate { min-height: 1.3em !important; }
+
+/* Guide panel: animated bright-orange gradient border. */
+@property --vbeam { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes vbeam-spin { to { --vbeam: 360deg; } }
+.iopex-voice { border-color: transparent !important; }
+.iopex-voice::before {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.2px;
+  background: conic-gradient(from var(--vbeam), #FE5E00, #FFB25E 18%, #FFD9A0 32%, #FE5E00 55%, rgba(254,94,0,.35) 78%, #FE5E00);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none; z-index: 2;
+  animation: vbeam-spin 3s linear infinite;
+  /* Kept at 20% visibility in every state (UI team, 21 Sep 2026). */
+  opacity: .2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .iopex-voice::before { animation: none; background: rgba(254,94,0,.2); }
+}
+
+/* ------------------------------------------------------------------ gate ---
+   Static access code screen (src/access/). Deliberately plain: it is the first
+   thing a client sees on a bad day, so it reads as "this is a private demo",
+   not as an error page. */
+.gate {
+  position: fixed; inset: 0; z-index: 2147483000;
+  display: grid; place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(1100px 600px at 50% -10%, rgba(111,108,255,.16), transparent 70%),
+    var(--scrim);
+  backdrop-filter: blur(6px);
+}
+.gate-card {
+  width: min(420px, 100%);
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 34px 32px 28px;
+  border: 1px solid var(--line); border-radius: 18px;
+  background: var(--surface); box-shadow: var(--shadow);
+  animation: gate-in var(--dur-entrance) var(--ease-entrance) both;
+}
+.gate-brand { margin: 0; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-faint); }
+.gate-title { margin: 0; font-size: 24px; line-height: 1.2; color: var(--text); }
+.gate-lede { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-dim); }
+.gate-input {
+  margin-top: 6px; padding: 13px 15px;
+  font-size: 17px; letter-spacing: .28em; color: var(--text);
+  background: var(--bg-soft); border: 1px solid var(--line-strong); border-radius: 11px;
+  transition: border-color var(--dur-hover) var(--ease-hover);
+}
+.gate-input:focus { outline: none; border-color: var(--accent-a); }
+.gate-go {
+  padding: 12px 16px; border: 0; border-radius: 11px; cursor: pointer;
+  font: inherit; font-weight: 600; color: #120b06;
+  background: linear-gradient(120deg, var(--accent-a), var(--accent-b));
+  transition: transform var(--dur-hover) var(--ease-hover), filter var(--dur-hover) var(--ease-hover);
+}
+.gate-go:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.gate-cancel {
+  padding: 4px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--text-dim);
+}
+.gate-cancel:hover { color: var(--text); }
+.gate-msg { margin: 0; min-height: 1.2em; font-size: 12.5px; color: var(--text-faint); }
+.gate-card.is-wrong .gate-input { border-color: var(--ember); }
+.gate-card.is-wrong .gate-msg { color: var(--ember); }
+.gate-card.is-wrong { animation: gate-shake .4s var(--ease-hover) both; }
+
+@keyframes gate-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes gate-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); } 40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); } 80% { transform: translateX(3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-card, .gate-card.is-wrong { animation: none; }
+}

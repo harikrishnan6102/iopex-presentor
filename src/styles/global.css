@@ -1,0 +1,989 @@
+  :root {
+    --bg:#0a0a10; --surface:#15161e; --text:#f1efe9; --text-dim:#989ea7; --text-faint:#5a5e68;
+    --ember:#f2661c; --gold:#ffc845; --line: rgba(255,255,255,.1); --scrim: rgba(10,10,16,0.86);
+    /* extra variables used by the DigiVox page's styles below */
+    --bg-soft:#111219; --surface-2:#1b1c26; --iopex:#6f6cff; --iopex-2:#a99bff;
+    --scan:#33d8c2; --insight:#4fb0ff; --line-strong: rgba(255,255,255,.17);
+    --shadow: 0 40px 110px rgba(0,0,0,.6); --star-op:1;
+    /* live per-product accent pair — the JS swaps these two on every
+       carousel/product change so each product reads as its own world
+       instead of all five sharing one hardcoded ember/gold accent. */
+    --accent-a: var(--ember); --accent-b: var(--gold);
+    /* one shared motion language for the whole kiosk — every hand-tuned
+       transition below was previously on its own bezier/duration; these two
+       curves now cover entrances/exits and hovers/toggles respectively so
+       switching between hero, carousel, and product deep-dives feels like
+       one system instead of several stitched-together demos. */
+    --ease-entrance: cubic-bezier(.2,.7,.2,1); --ease-hover: cubic-bezier(.45,0,.2,1);
+    --dur-entrance: .6s; --dur-hover: .25s;
+  }
+  * {box-sizing:border-box;}
+  html {scroll-behavior:smooth; scrollbar-width:none; -ms-overflow-style:none;}
+  html::-webkit-scrollbar { display:none; width:0; height:0; }
+  body {
+    margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden; scrollbar-width:none; -ms-overflow-style:none;
+  }
+  body::-webkit-scrollbar { display:none; width:0; height:0; }
+  h1, h2, h3 { font-family:'Space Grotesk',sans-serif; letter-spacing:-0.01em; margin:0; }
+  p { margin:0; }
+  a { color:inherit; text-decoration:none; }
+  button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+
+  #canvas-container { position:fixed; inset:0; z-index:0; }
+  #canvas-container canvas { display:block; }
+
+  /* -------- LOGO-SPLIT PRODUCT CAROUSEL --------
+     Fixed layer sitting between the 3D canvas and the page content. It
+     fades in as the iOPEX particle mark parts down the middle, showing
+     whichever product section is currently in view. It's stacked ABOVE
+     <main> (z-index 5 vs 1) so its own arrows/dots are always the topmost
+     hit target once .interactive is on — otherwise the (invisible, but
+     still click-catching) .product sections underneath silently swallow
+     the clicks. When not .interactive, pointer-events:none lets clicks
+     and scroll pass straight through to the page regardless of z-index. */
+  #logo-carousel {
+    position:fixed; inset:0; z-index:5;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding-top:70px;
+    opacity:0; pointer-events:none;
+  }
+  #logo-carousel.interactive { pointer-events:auto; }
+
+  /* -------- SINGLE-CARD CAROUSEL WITH PEEK FRAMES --------
+     One product screenshot front and center at a time, with softly blurred,
+     scaled-down copies of the neighbouring products peeking in on either
+     side for depth — not a 3D ring, just a classic centered carousel. */
+  .lc-stage { position:relative; width:100%; max-width:min(1800px, 90vw); height:clamp(300px, 24vw, 610px); margin:0 auto; perspective:1400px; touch-action:pan-y; }
+  .cf-card {
+    position:absolute; top:50%; left:50%;
+    width:clamp(480px, 40vw, 1040px); height:clamp(270px, 22.5vw, 585px);
+    margin:calc(clamp(270px, 22.5vw, 585px) / -2) 0 0 calc(clamp(480px, 40vw, 1040px) / -2);
+    border-radius:16px; overflow:hidden; border:1px solid var(--line);
+    box-shadow:0 50px 120px rgba(0,0,0,.6); background:var(--surface); cursor:pointer;
+    display:flex; flex-direction:column;
+    will-change:transform, opacity, filter;
+  }
+  .cf-card.is-center { box-shadow:0 50px 120px rgba(0,0,0,.6), 0 0 0 1px color-mix(in srgb, var(--accent-a) 35%, transparent); transition:box-shadow .5s var(--ease-hover); }
+  .cf-card.is-center:hover { box-shadow:0 55px 130px rgba(0,0,0,.7), 0 0 0 1px color-mix(in srgb, var(--accent-a) 55%, transparent); }
+  .lc-fbar { height:clamp(30px, 2.2vw, 42px); background:#282828; display:flex; align-items:center; gap:6px; padding:0 14px; position:relative; flex:none; border-bottom:1px solid var(--line); transition:background .2s ease; }
+  .lc-fbar span { width:8px; height:8px; border-radius:50%; background:var(--line-strong); transition:background .2s ease; }
+  .lc-fbar.theme-light { background:#f2f2f4; border-bottom-color:rgba(0,0,0,.08); }
+  .lc-fbar.theme-light span { background:rgba(0,0,0,.18); }
+  .lc-shot-wrap { flex:1 1 auto; min-height:0; background:var(--surface); display:flex; }
+  .lc-shot { display:block; width:100%; height:100%; object-fit:cover; object-position:top center; }
+
+  .lc-caption { text-align:center; margin-top:30px; opacity:1; filter:blur(0px); transition:opacity .7s ease, filter .7s ease; }
+  .lc-caption.fade { opacity:0; filter:blur(9px); }
+  /* particle burst fired at the exact moment the logo swaps to a new
+     product (see spawnLogoParticleBurst in the JS) — small sparks flung
+     outward from the logo's center in the product's own accent colors, so
+     the change reads as a distinct "hit" rather than a plain crossfade. */
+  @keyframes lc-particle-fly {
+    0%   { opacity:1; transform:translate(-50%,-50%) translate(0,0) scale(1); }
+    100% { opacity:0; transform:translate(-50%,-50%) translate(var(--tx), var(--ty)) scale(.25); }
+  }
+  .lc-particle {
+    position:absolute; top:50%; left:50%; width:7px; height:7px; border-radius:50%;
+    background:linear-gradient(120deg,var(--accent-a),var(--accent-b));
+    box-shadow:0 0 10px 1px rgba(255,180,90,.55);
+    pointer-events:none; will-change:transform,opacity;
+    animation:lc-particle-fly .75s cubic-bezier(.16,.8,.24,1) forwards;
+  }
+  @media (prefers-reduced-motion: reduce){ .lc-particle { animation:none; display:none; } }
+  .lc-caption h3 { font-size:clamp(22px,2.4vw,40px); font-weight:700; }
+  .lc-title-logo {
+    height:clamp(28px, 3.2vw, 48px); width:auto; max-width:70vw; display:inline-block;
+    /* same transition as the hero-section logo (see .hero-slide-logo) —
+       fade + scale + vertical slide + a warm glow that builds while shown,
+       tied to the .lc-caption/.fade toggle used for every carousel/
+       autoplay product change instead of the hero's is-active/is-leaving. */
+    opacity:1; transform:scale(1) translateY(0);
+    filter:drop-shadow(0 0 22px rgba(243,112,33,.55));
+    transition:opacity .7s ease, transform .7s ease, filter .7s ease;
+    animation:hero-logo-glow-pulse 2.6s ease-in-out infinite;
+  }
+  .lc-caption.fade .lc-title-logo {
+    opacity:0; transform:scale(1.1) translateY(-20px);
+    filter:drop-shadow(0 0 0px transparent);
+    animation:none;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .lc-title-logo { transition:opacity .35s ease !important; transform:none !important; animation:none !important; filter:none !important; }
+  }
+  .lc-caption p { margin-top:8px; font-size:clamp(13.5px,1vw,18px); color:var(--text-dim); }
+  .lc-nav { margin-top:26px; display:flex; align-items:center; gap:14px; }
+  .lc-playpause {
+    width:30px; height:30px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.06); border:1px solid var(--line-strong); color:var(--text-dim);
+    cursor:pointer; transition:background .25s ease, color .25s ease, border-color .25s ease, transform .15s ease;
+  }
+  .lc-playpause svg { width:13px; height:13px; display:block; }
+  .lc-playpause .icon-play { display:none; }
+  .lc-playpause.is-paused .icon-pause { display:none; }
+  .lc-playpause.is-paused .icon-play { display:block; }
+  .lc-playpause:hover { background:rgba(255,255,255,.12); color:var(--text); border-color:rgba(255,255,255,.3); }
+  .lc-playpause:active { transform:scale(.9); }
+  @media (min-width:2400px){ .lc-playpause { width:36px; height:36px; } .lc-playpause svg { width:15px; height:15px; } }
+  .lc-arrow svg { width:15px; height:15px; }
+  .lc-dots { display:flex; align-items:center; gap:7px; }
+  .lc-dots .dot { width:9px; height:9px; border-radius:100px; background:rgba(255,255,255,.28); border:none; padding:0; transition:width .25s ease, background .25s ease; }
+  .lc-dots .dot.current { width:26px; background:linear-gradient(120deg,var(--accent-a),var(--accent-b)); transition:width .25s ease, background .4s var(--ease-hover); }
+  @media (min-width:2400px){ .lc-dots .dot { width:11px; height:11px; } .lc-dots .dot.current { width:32px; } .lc-product-link { padding:11px 22px; font-size:13.5px; } }
+  .lc-product-links { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:22px; max-width:min(700px, 88vw); }
+  .lc-product-link {
+    flex:none; border-radius:100px; cursor:pointer; white-space:nowrap;
+    padding:9px 18px; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; letter-spacing:.02em;
+    background:rgba(255,255,255,.05); border:1px solid var(--line-strong); color:var(--text-dim);
+    transition:background var(--dur-hover) var(--ease-hover), border-color var(--dur-hover) var(--ease-hover), color var(--dur-hover) var(--ease-hover), transform .15s var(--ease-hover);
+  }
+  .lc-product-link:hover { background:rgba(255,255,255,.1); color:var(--text); }
+  .lc-product-link:active { transform:scale(.94); }
+  .lc-product-link.current { background:linear-gradient(120deg,var(--ember),var(--gold)); border-color:transparent; color:#181109; transition:background .4s var(--ease-hover), color .4s var(--ease-hover); } /* fixed brand orange — intentionally NOT tied to the per-product --accent-a/--accent-b, which shift per product */
+  .lc-product-link.is-disabled { opacity:.4; cursor:not-allowed; }
+  .lc-product-link.is-disabled:hover { background:rgba(255,255,255,.05); color:var(--text-dim); }
+  /* ---- MOBILE: same fixed carousel overlay, just resized to fit a phone
+     instead of being hidden. Desktop rules above are untouched — everything
+     here is scoped to this one breakpoint, so nothing here can affect large
+     displays. Card offsets in layoutCoverflow() are already percentage-of-
+     own-width (xPercent), so the coverflow math scales correctly to
+     whatever width these cards get here — no JS changes needed. */
+  @media (max-width:760px){
+    #logo-carousel { padding-top:56px; }
+    .lc-stage { max-width:94vw; height:clamp(150px, 48vw, 275px); perspective:900px; }
+    .cf-card {
+      width:clamp(220px, 80vw, 420px); height:clamp(124px, 45vw, 236px);
+      margin:calc(clamp(124px, 45vw, 236px) / -2) 0 0 calc(clamp(220px, 80vw, 420px) / -2);
+      border-radius:12px;
+    }
+    .lc-fbar { height:clamp(22px, 6vw, 30px); padding:0 10px; }
+    .lc-caption { margin-top:18px; }
+    .lc-caption h3 { font-size:clamp(18px, 5.5vw, 26px); }
+    .lc-title-logo { height:clamp(22px, 7vw, 32px); }
+    .lc-caption p { font-size:clamp(12px, 3.4vw, 14px); padding:0 6vw; }
+    .lc-nav { margin-top:16px; gap:10px; }
+    .lc-playpause { width:26px; height:26px; }
+    .lc-playpause svg { width:11px; height:11px; }
+    .lc-product-links { margin-top:16px; gap:6px; max-width:92vw; }
+    .lc-product-link { padding:7px 13px; font-size:10.5px; }
+  }
+
+  main { position:relative; z-index:1; }
+
+  section { position:relative; min-height:100vh; display:flex; align-items:center; padding:0 clamp(20px,6vw,90px); }
+  /* these three sections only exist to add scroll distance for the
+     hero->carousel scrub above (their own content is hidden — see
+     ".product .wrap { display:none !important; }" further down) — shrunk
+     from 100vh each (300vh combined) down to a small fraction of that, so
+     the whole hero-to-carousel journey fits within a single scroll
+     gesture instead of requiring several long scrolls to reach the end. */
+  #digivox.product, #digiaura.product, #digikoach.product { min-height:9vh; }
+
+  /* -------- HERO -------- */
+  .hero { min-height:100vh; flex-direction:column; justify-content:flex-end; text-align:center; gap:16px; padding-bottom:clamp(20px,3vh,50px); }
+  .hero h1 { font-size:clamp(30px, min(4.6vw, 5.6vh), 56px); line-height:1.08; font-weight:600; }
+  .hero p.lede { font-size:clamp(15px, min(1.15vw, 1.8vh), 18px); color:var(--text-dim); line-height:1.6; max-width:64ch; margin:0 auto; }
+
+  /* -------- ROTATING HERO BANNER --------
+     Three title/description slides stacked in the same spot, cycling one
+     by one: the outgoing slide eases up and fades out while the incoming
+     one eases in from below — the classic hero-banner text rotation. All
+     slides are always in the DOM (absolutely stacked) so heights never
+     jump; the rotator just reserves enough room for the tallest slide. */
+  .hero-rotator { position:relative; width:min(1100px, 94vw); margin:0 auto; min-height:clamp(140px, 19vh, 280px); }
+  .hero-slide {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:16px;
+    opacity:0;
+    transition:opacity .8s ease;
+    pointer-events:none;
+  }
+  .hero-slide.is-active { opacity:1; pointer-events:auto; }
+  .hero-slide.is-leaving { opacity:0; }
+  .hero-slide-logo {
+    height:clamp(26px, min(3vw, 3.8vh), 40px); width:auto; display:block;
+    /* matches the reference transition the user attached: fade + scale +
+       vertical slide + a warm glow that builds in as the logo settles,
+       triggered off this file's existing is-active/is-leaving class
+       toggling (see the hero rotation interval in the JS) rather than a
+       pure CSS auto-loop, since timing here also has to stay in sync with
+       the particle-scene/accent-color swap and the click-to-open link. */
+    opacity:0; transform:scale(.8) translateY(20px);
+    filter:drop-shadow(0 0 0px transparent);
+    transition:opacity .7s ease, transform .7s ease, filter .7s ease;
+  }
+  .hero-slide.is-active .hero-slide-logo {
+    opacity:1; transform:scale(1) translateY(0);
+    filter:drop-shadow(0 0 22px rgba(243,112,33,.55));
+    animation:hero-logo-glow-pulse 2.6s ease-in-out .7s infinite;
+  }
+  .hero-slide.is-leaving .hero-slide-logo {
+    opacity:0; transform:scale(1.1) translateY(-20px);
+    filter:drop-shadow(0 0 0px transparent);
+    animation:none;
+  }
+  @keyframes hero-logo-glow-pulse {
+    0%, 100% { filter:drop-shadow(0 0 18px rgba(243,112,33,.45)); }
+    50%      { filter:drop-shadow(0 0 30px rgba(243,112,33,.75)); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .hero-slide-logo { transition:opacity .35s ease !important; transform:none !important; animation:none !important; filter:none !important; }
+  }
+
+  /* ---------- HERO TITLE "TEXT ROLL" (per-letter 3D roll) ----------
+     Adapted from a React/Framer-Motion (motion-primitives "TextRoll")
+     component the user provided — this file has no React/Tailwind/shadcn/
+     npm build step (it's a single static HTML page using vanilla JS, CSS,
+     Three.js and GSAP), so the component can't be installed as-is; this
+     reproduces the same per-letter rotateX "roll" motion in plain CSS/JS,
+     applied to the hero headline only (an image logo has no letters to
+     roll) — see rollifyHeroTitles()/rollHeroTitle() further down in the JS. */
+  .htr-letter { display:inline-block; perspective:600px; }
+  .htr-inner { display:inline-block; backface-visibility:hidden; transform-origin:50% 50%; }
+  .htr-roll-in .htr-inner { animation:htr-roll-in .5s ease forwards; }
+  .htr-roll-out .htr-inner { animation:htr-roll-out .5s ease forwards; }
+  @keyframes htr-roll-in { from { transform:rotateX(-100deg); opacity:0; } to { transform:rotateX(0deg); opacity:1; } }
+  @keyframes htr-roll-out { from { transform:rotateX(0deg); opacity:1; } to { transform:rotateX(100deg); opacity:0; } }
+  @media (prefers-reduced-motion: reduce){
+    .htr-roll-in .htr-inner, .htr-roll-out .htr-inner { animation:none !important; transform:none !important; }
+  }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  .scroll-cue { margin-top:36px; font-size:12px; color:var(--text-faint); display:flex; flex-direction:column; align-items:center; gap:8px; font-family:'JetBrains Mono',monospace; }
+  .scroll-cue .line { width:1px; height:34px; background:linear-gradient(var(--text-faint), transparent); animation:cue-pulse 1.8s ease-in-out infinite; }
+  @keyframes cue-pulse{ 0%,100%{ opacity:.3; } 50%{ opacity:1; } }
+
+  /* -------- PRODUCT SECTIONS -------- */
+  .product { gap:clamp(30px,5vw,70px); }
+  .product .wrap { display:flex; align-items:center; gap:clamp(30px,5vw,70px); width:100%; max-width:1280px; margin:0 auto; }
+  .product.reverse .wrap { flex-direction:row-reverse; }
+  @media (max-width:900px){ .product .wrap, .product.reverse .wrap { flex-direction:column; text-align:center; } }
+
+  .p-text { flex:1 1 0; max-width:460px; padding:40px 36px; background:linear-gradient(135deg, var(--scrim) 0%, rgba(10,10,16,0.55) 70%, rgba(10,10,16,0) 100%); }
+  @media (max-width:900px){ .p-text { max-width:100%; background:var(--scrim); } }
+  .status { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:5px 11px; border-radius:100px; border:1px solid var(--line); margin-bottom:18px; }
+  .status .dot { width:6px; height:6px; border-radius:50%; }
+  .status.live .dot { background:#3ddc84; box-shadow:0 0 0 3px rgba(61,220,132,.2); }
+  .status.dev .dot { background:var(--text-faint); }
+  .p-text h2 { font-size:clamp(30px,3.4vw,44px); margin-bottom:14px; }
+  .p-text p.desc { font-size:14.5px; color:var(--text-dim); line-height:1.7; margin-bottom:14px; max-width:44ch; }
+  .p-stats { display:flex; gap:28px; margin-top:26px; flex-wrap:wrap; }
+  @media (max-width:900px){ .p-stats { justify-content:center; } }
+  .p-stat b { display:block; font-family:'Space Grotesk',sans-serif; font-size:22px; }
+  .p-stat span { font-size:11px; color:var(--text-faint); }
+
+  .shot-frame { flex:1 1 0; max-width:560px; border-radius:16px; overflow:hidden; border:1px solid var(--line); box-shadow:0 40px 100px rgba(0,0,0,.55); background:var(--surface); }
+  .shot-frame .fbar { height:32px; background:#f2f2f4; display:flex; align-items:center; gap:6px; padding:0 12px; }
+  .shot-frame .fbar span { width:8px; height:8px; border-radius:50%; background:rgba(0,0,0,.18); }
+  .shot-frame img { width:100%; display:block; background:#fff; }
+  .shot-link { display:block; flex:1 1 0; max-width:560px; cursor:pointer; }
+  .shot-link .shot-frame { transition:transform .35s ease, border-color .35s ease; }
+  .shot-link:hover .shot-frame { transform:translateY(-6px); border-color:var(--ember); }
+  .go-link { display:inline-flex; align-items:center; gap:6px; margin-top:22px; font-size:13px; font-weight:600; color:var(--ember); }
+  .go-link:hover { text-decoration:underline; }
+  .live-pill { display:inline-flex; align-items:center; gap:6px; position:relative; }
+
+  ::selection { background:var(--ember); color:#fff; }
+
+  /* The fixed #logo-carousel above already shows each product's screenshot,
+     title and tagline as you scroll — so the original in-section screenshot
+     AND text panel are now redundant and hidden here. Placed last in the
+     stylesheet (after the rules that originally set them) so this override
+     actually wins the cascade instead of being silently overridden. The
+     .product sections are kept at full height purely as scroll "slots" that
+     drive which product the fixed carousel displays. */
+  .shot-link { display:none !important; }
+  .product .wrap { display:none !important; }
+  /* ================= DIGIVOX PAGE (shared header globals + scoped page styles) ================= */
+  /* without this, some mobile browsers can interpret a vertical swipe as a
+     native scroll/bounce/pull-to-refresh gesture and hijack it away from
+     our own swipe handler (see the touchstart/touchmove/touchend/touchcancel
+     wiring further down) before it ever completes — this was previously
+     scoped to #digivox-view only, so swipe-to-navigate was unreliable on
+     the other four product pages on real mobile devices. */
+  #digivox-view, #elevaite-view, #digikoach-view, #pexminer-view, #digiaura-view { touch-action: none; }
+  
+  
+  
+  
+  
+  
+  #digivox-view h1, #elevaite-view h1, #digikoach-view h1, #pexminer-view h1, #digiaura-view h1, #digivox-view h2, #elevaite-view h2, #digikoach-view h2, #pexminer-view h2, #digiaura-view h2, #digivox-view h3, #elevaite-view h3, #digikoach-view h3, #pexminer-view h3, #digiaura-view h3, #digivox-view .disp, #elevaite-view .disp, #digikoach-view .disp, #pexminer-view .disp, #digiaura-view .disp { font-family:'Space Grotesk', sans-serif; letter-spacing:-0.01em; margin:0; }
+  
+  
+  
+  
+  
+  #digivox-view section, #elevaite-view section, #digikoach-view section, #pexminer-view section, #digiaura-view section { position:relative; padding: clamp(60px,9vh,110px) 0; }
+  #digivox-view .wrap, #elevaite-view .wrap, #digikoach-view .wrap, #pexminer-view .wrap, #digiaura-view .wrap { width:min(1320px, 92vw); margin:0 auto; }
+  #digivox-view [data-anim], #elevaite-view [data-anim], #digikoach-view [data-anim], #pexminer-view [data-anim], #digiaura-view [data-anim] { opacity:0; transform:translateY(28px); }
+  #digivox-view [data-anim].in, #elevaite-view [data-anim].in, #digikoach-view [data-anim].in, #pexminer-view [data-anim].in, #digiaura-view [data-anim].in { opacity:1; transform:none; transition:opacity .8s var(--ease-entrance), transform .8s var(--ease-entrance); }
+  @media (min-width:2400px){ #digivox-view .wrap, #elevaite-view .wrap, #digikoach-view .wrap, #pexminer-view .wrap, #digiaura-view .wrap { width:min(1680px, 78vw); } }
+
+  /* cursor */
+  
+  
+  
+  
+  
+  
+
+  /* dock */
+  .dock { position:fixed; top:0; left:0; right:0; z-index:80; display:flex; align-items:center; justify-content:space-between; padding: clamp(14px,2.2vh,24px) clamp(18px,3vw,48px); backdrop-filter:blur(14px); background:linear-gradient(var(--bg) 40%, transparent); }
+  .brand { display:flex; align-items:center; gap:10px; min-width:0; }
+  .brand-logo { height:clamp(20px, 5.5vw, 26px); width:auto; display:block; flex:none; }
+  .brand-divider { width:1px; height:22px; background:rgba(255,255,255,.22); flex:none; margin:0 8px; }
+  .site-portal-name {
+    font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:clamp(15px, 4.2vw, 26px); letter-spacing:.01em;
+    background-image:linear-gradient(135deg, #f2661c, #ffffff, #c9cdd3, #ffc845, #ffffff, #f2661c, #ffffff, #c9cdd3, #ffc845, #ffffff);
+    background-size:500% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:site-portal-gradient-flow 5s linear infinite;
+    white-space:nowrap;
+  }
+  @keyframes site-portal-gradient-flow {
+    0%   { background-position:0% 50%; }
+    50%  { background-position:100% 50%; }
+    100% { background-position:0% 50%; }
+  }
+  .nav-links { display:flex; gap:32px; font-size:14px; color:var(--text-dim); }
+  .nav-links a:hover { color:var(--text); }
+  .dock-right { display:flex; align-items:center; gap:10px; }
+  .theme-btn { width:38px; height:38px; border-radius:50%; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; background:var(--surface); }
+  .theme-btn svg { width:16px; height:16px; }
+  #digivox-view .btn, #elevaite-view .btn, #digikoach-view .btn, #pexminer-view .btn, #digiaura-view .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 22px; border-radius:100px; font-size:14px; font-weight:600; white-space:nowrap; }
+  #digivox-view .btn-primary, #elevaite-view .btn-primary, #digikoach-view .btn-primary, #pexminer-view .btn-primary, #digiaura-view .btn-primary { background:linear-gradient(120deg,var(--iopex),var(--iopex-2)); color:#fff; }
+  #digivox-view .btn-ember, #elevaite-view .btn-ember, #digikoach-view .btn-ember, #pexminer-view .btn-ember, #digiaura-view .btn-ember { background:linear-gradient(120deg,var(--ember),var(--gold)); color:#181109; }
+  #digivox-view .btn-ghost, #elevaite-view .btn-ghost, #digikoach-view .btn-ghost, #pexminer-view .btn-ghost, #digiaura-view .btn-ghost { border:1px solid var(--line-strong); background:var(--surface); }
+  #digivox-view .btn-ghost:hover, #elevaite-view .btn-ghost:hover, #digikoach-view .btn-ghost:hover, #pexminer-view .btn-ghost:hover, #digiaura-view .btn-ghost:hover { border-color:var(--iopex); }
+  #digivox-view .btn-disabled, #elevaite-view .btn-disabled, #digikoach-view .btn-disabled, #pexminer-view .btn-disabled, #digiaura-view .btn-disabled { border:1px solid var(--line-strong); background:var(--surface); color:var(--text-faint); }
+  @media (max-width:900px){ .nav-links { display:none; } }
+
+  /* eyebrow / headings (shared) */
+  #digivox-view .eyebrow, #elevaite-view .eyebrow, #digikoach-view .eyebrow, #pexminer-view .eyebrow, #digiaura-view .eyebrow { display:inline-flex; align-items:center; gap:12px; font-size:22px; font-weight:700; font-family:'Space Grotesk',sans-serif; letter-spacing:-0.01em; color:var(--text); margin-bottom:16px; }
+  #digivox-view .eyebrow i, #elevaite-view .eyebrow i, #digikoach-view .eyebrow i, #pexminer-view .eyebrow i, #digiaura-view .eyebrow i { width:22px; height:2px; background:var(--iopex); display:inline-block; }
+  #digivox-view .eyebrow.ember i, #elevaite-view .eyebrow.ember i, #digikoach-view .eyebrow.ember i, #pexminer-view .eyebrow.ember i, #digiaura-view .eyebrow.ember i { background:var(--ember); }
+  #digivox-view .eyebrow.insight i, #elevaite-view .eyebrow.insight i, #digikoach-view .eyebrow.insight i, #pexminer-view .eyebrow.insight i, #digiaura-view .eyebrow.insight i { background:var(--insight); }
+  #elevaite-view .eyebrow.gold i { background:var(--gold); }
+  #digivox-view .lede, #elevaite-view .lede, #digikoach-view .lede, #pexminer-view .lede, #digiaura-view .lede { font-size:clamp(15px,1.15vw,18px); color:var(--text-dim); line-height:1.6; max-width:52ch; }
+  #digivox-view .h-title, #elevaite-view .h-title, #digikoach-view .h-title, #pexminer-view .h-title, #digiaura-view .h-title { font-size:clamp(20px,2.4vw,30px); line-height:1.08; font-weight:600; }
+  #digivox-view .tag, #elevaite-view .tag, #digikoach-view .tag, #pexminer-view .tag, #digiaura-view .tag { font-size:11px; padding:4px 10px; border-radius:100px; border:1px solid var(--line); }
+  #digivox-view .tag.b1 { color:var(--gold); border-color:rgba(255,200,69,.4); }
+  #digivox-view .tag.b2 { color:var(--scan); border-color:rgba(51,216,194,.4); }
+  #digivox-view .tag.status, #elevaite-view .tag.status, #digikoach-view .tag.status, #pexminer-view .tag.status, #digiaura-view .tag.status { background:var(--surface-2); color:var(--text-dim); }
+
+  /* ================================================================
+     COSMOS / AURORA BACKGROUND — sits behind the kinetic grid canvas,
+     several large blurred color blobs drifting slowly + a faint
+     twinkling starfield, for a "living" deep-space aurora feel.
+  ================================================================ */
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /* each keyframe set is a closed loop (ends back where it starts) so the
+     motion is continuous — no back-and-forth snap, no pause at the ends */
+  
+  
+  
+  
+  
+  
+  
+  /* protective "reverse vignette" — keeps the center of every slide (where
+     headlines and body text live) calm and legible no matter where the
+     aurora blobs have drifted to; color stays lively toward the edges */
+  
+  
+  /* deliberately not gated by prefers-reduced-motion: this is an ambient
+     kiosk backdrop, not tied to any individual visitor's own settings */
+
+
+  /* kinetic grid background — now a fixed full-viewport layer behind every kiosk slide */
+  
+
+  /* -------- HERO -------- */
+  #digivox-view .hero, #elevaite-view .hero, #digikoach-view .hero, #pexminer-view .hero, #digiaura-view .hero { position:relative; min-height:100vh; display:flex; align-items:center; padding:150px 0 80px; overflow:hidden; }
+  #digivox-view .hero .wrap, #elevaite-view .hero .wrap, #digikoach-view .hero .wrap, #pexminer-view .hero .wrap, #digiaura-view .hero .wrap { position:relative; z-index:2; text-align:center; }
+  #digivox-view .hero .eyebrow, #elevaite-view .hero .eyebrow, #digikoach-view .hero .eyebrow, #pexminer-view .hero .eyebrow, #digiaura-view .hero .eyebrow { justify-content:center; width:100%; }
+  #digivox-view .hero-spot { margin:8px 0 40px; }
+  #digivox-view .spot-h { font-size:clamp(28px,4vw,46px); font-weight:600; }
+  #digivox-view .spot-sub { font-size:13.5px; color:var(--text-dim); margin:12px 0 34px; }
+  #digivox-view .hero p.lede, #elevaite-view .hero p.lede, #digikoach-view .hero p.lede, #pexminer-view .hero p.lede, #digiaura-view .hero p.lede { margin:24px auto 0; text-align:center; }
+  #digivox-view .hero-cta, #elevaite-view .hero-cta, #digikoach-view .hero-cta, #pexminer-view .hero-cta, #digiaura-view .hero-cta { display:flex; gap:16px; justify-content:center; margin-top:36px; flex-wrap:wrap; }
+  #digivox-view .fact-row, #elevaite-view .fact-row, #digikoach-view .fact-row, #pexminer-view .fact-row, #digiaura-view .fact-row { display:flex; justify-content:center; gap:clamp(28px,4vw,64px); margin-top:70px; flex-wrap:wrap; }
+  #digivox-view .fact b, #elevaite-view .fact b, #digikoach-view .fact b, #pexminer-view .fact b, #digiaura-view .fact b { display:block; font-family:'Space Grotesk'; font-size:clamp(22px,2vw,30px); }
+  #digivox-view .fact span, #elevaite-view .fact span, #digikoach-view .fact span, #pexminer-view .fact span, #digiaura-view .fact span { font-size:11.5px; color:var(--text-faint); }
+
+  /* -------- PRODUCTS GRID -------- */
+  #digivox-view .sec-head, #elevaite-view .sec-head, #digikoach-view .sec-head, #pexminer-view .sec-head, #digiaura-view .sec-head { text-align:left; max-width:60ch; margin-bottom:48px; }
+  #digivox-view .sec-head h2, #elevaite-view .sec-head h2, #digikoach-view .sec-head h2, #pexminer-view .sec-head h2, #digiaura-view .sec-head h2 { font-size:clamp(28px,3.6vw,46px); font-weight:600; }
+  #digivox-view .products-grid { display:grid; grid-template-columns:1.1fr .95fr .95fr; gap:20px; }
+  #digivox-view .p-card { position:relative; border:1px solid var(--line); border-radius:22px; padding:30px 26px; background:var(--surface); overflow:hidden; transition:transform .4s ease, border-color .4s ease; }
+  #digivox-view .p-card:hover { transform:translateY(-6px); }
+  #digivox-view .p-card.live { border-color:rgba(242,102,28,.35); }
+  #digivox-view .p-glow { position:absolute; top:-40%; right:-30%; width:70%; height:70%; border-radius:50%; filter:blur(60px); opacity:.35; pointer-events:none; }
+  #digivox-view .p-status { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:5px 11px; border-radius:100px; border:1px solid var(--line-strong); margin-bottom:20px; }
+  #digivox-view .p-status .dot { width:6px; height:6px; border-radius:50%; }
+  #digivox-view .p-status.live .dot { background:#3ddc84; box-shadow:0 0 0 3px rgba(61,220,132,.2); }
+  #digivox-view .p-status.dev .dot { background:var(--text-faint); }
+  #digivox-view .p-card h3 { font-size:22px; margin-bottom:6px; }
+  #digivox-view .p-card .tagline { font-size:12.5px; color:var(--text-dim); margin-bottom:16px; }
+  #digivox-view .p-card p.desc { font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:24px; }
+  #digivox-view .p-card .go { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ember); }
+  #digivox-view .p-card.dev .go { color:var(--text-faint); }
+  #digivox-view .p-card .go svg { width:14px; height:14px; transition:transform .25s ease; }
+  #digivox-view .p-card:hover .go svg { transform:translateX(4px); }
+  @media (max-width:1000px){ #digivox-view .products-grid { grid-template-columns:1fr; } }
+
+  /* -------- SPOTLIGHT CAROUSEL (in hero) -------- */
+  #digivox-view .stage-wrap { position:relative; }
+  #digivox-view .stage { position:relative; width:min(680px,60vw); aspect-ratio:16/8.6; margin:0 auto; perspective:1600px; isolation:isolate; }
+  /* soft vignette behind the whole carousel (main frame + flanking side
+     frames) — generously oversized since the coverflow side-frames translate
+     well outside the stage's own box. Fades out at the edges instead of a
+     hard rectangle, so it reads as a natural glow, not a visible box, while
+     fully blocking the animated grid from showing through translucent frames. */
+  #digivox-view .stage::before {
+    content:''; position:absolute; inset:-18% -78%; z-index:0; pointer-events:none;
+    background:radial-gradient(60% 62% at 50% 50%, var(--bg) 0%, var(--bg) 38%, transparent 74%);
+  }
+  #digivox-view .frame, #elevaite-view .frame, #digikoach-view .frame, #pexminer-view .frame, #digiaura-view .frame { position:absolute; inset:0; width:100%; height:100%; border-radius:20px; overflow:hidden; border:1px solid var(--line-strong); box-shadow:var(--shadow); background:var(--surface); cursor:inherit; transform-style:preserve-3d; transition:opacity .15s linear, box-shadow .5s ease; user-select:none; -webkit-user-select:none; }
+  /* gorgeous orange glow underneath whichever frame is centered/active —
+     box-shadow (not a pseudo-element) so it isn't clipped by the frame's
+     own overflow:hidden, which is needed for the screenshot's rounded corners */
+  #digivox-view .frame.is-active {
+    box-shadow:
+      var(--shadow),
+      0 38px 55px -18px rgba(242,102,28,.55),
+      0 60px 90px -24px rgba(255,200,69,.28);
+  }
+  @media (min-width:1700px){ #digivox-view .stage { width:min(800px,50vw); } }
+  @media (min-width:2400px){ #digivox-view .stage { width:min(980px,44vw); } }
+  @media (max-width:640px){ #digivox-view .stage { width:88vw; aspect-ratio:16/10; } }
+  #digivox-view .frame .fbar { height:34px; background:#f2f2f4; display:flex; align-items:center; gap:6px; padding:0 12px; border-bottom:1px solid rgba(0,0,0,.08); }
+  #digivox-view .frame .fbar span { width:8px; height:8px; border-radius:50%; background:rgba(0,0,0,.18); }
+  #digivox-view .frame img { width:100%; height:calc(100% - 34px); object-fit:contain; object-position:center top; display:block; background:#ffffff; pointer-events:none; -webkit-user-drag:none; }
+  #digivox-view .frame .fplaceholder { width:100%; height:calc(100% - 34px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:20px; pointer-events:none; }
+  #digivox-view .frame .fplaceholder b { font-family:'Space Grotesk'; font-size:22px; }
+  #digivox-view .frame .fplaceholder span { font-size:12px; color:var(--text-faint); }
+  #digivox-view .frame .fplaceholder .badge { font-size:11px; padding:5px 12px; border-radius:100px; border:1px solid var(--line-strong); color:var(--text-dim); }
+  #digivox-view .live-pill, #elevaite-view .live-pill, #digikoach-view .live-pill, #pexminer-view .live-pill, #digiaura-view .live-pill { position:absolute; top:14px; left:14px; z-index:4; display:flex; align-items:center; gap:6px; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); color:#fff; font-size:11px; font-weight:600; padding:5px 11px 5px 8px; border-radius:100px; }
+  #digivox-view .live-pill .d, #elevaite-view .live-pill .d, #digikoach-view .live-pill .d, #pexminer-view .live-pill .d, #digiaura-view .live-pill .d { width:7px; height:7px; border-radius:50%; background:#3ddc84; animation:pulse 1.8s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  #digivox-view .caption, #elevaite-view .caption, #digikoach-view .caption, #pexminer-view .caption, #digiaura-view .caption { text-align:center; margin-top:34px; }
+  #digivox-view .caption h3, #elevaite-view .caption h3, #digikoach-view .caption h3, #pexminer-view .caption h3, #digiaura-view .caption h3 { font-size:clamp(18px,2vw,24px); margin-bottom:8px; }
+  #digivox-view .caption p, #elevaite-view .caption p, #digikoach-view .caption p, #pexminer-view .caption p, #digiaura-view .caption p { font-size:13.5px; color:var(--text-dim); }
+  #digivox-view .dots, #elevaite-view .dots, #digikoach-view .dots, #pexminer-view .dots, #digiaura-view .dots { display:flex; justify-content:center; gap:9px; margin-top:26px; }
+  
+  #digivox-view .dots button, #elevaite-view .dots button, #digikoach-view .dots button, #pexminer-view .dots button, #digiaura-view .dots button { width:8px; height:8px; border-radius:50%; background:var(--line-strong); transition:all .25s ease; }
+  #digivox-view .dots button.active, #elevaite-view .dots button.active, #digikoach-view .dots button.active, #pexminer-view .dots button.active, #digiaura-view .dots button.active { width:22px; border-radius:5px; background:var(--ember); }
+  #digivox-view .stage-cta { text-align:center; margin-top:30px; }
+
+  /* -------- DIGIVOX PRODUCT ZONE -------- */
+  #digivox-view #digivox, #elevaite-view #digivox { background:radial-gradient(120% 60% at 50% 0%, rgba(242,102,28,.06), transparent 60%); border-top:1px solid var(--line); }
+  #digivox-view .dv-intro .wrap { display:grid; grid-template-columns:.92fr 1.08fr; gap:40px; align-items:center; }
+  #elevaite-view .ev-intro .wrap { display:grid; grid-template-columns:.92fr 1.08fr; gap:40px; align-items:center; }
+  #elevaite-view #ev-why .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #elevaite-view #ev-features .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #elevaite-view #ev-results .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digikoach-view .dk-intro .wrap { display:grid; grid-template-columns:.92fr 1.08fr; gap:40px; align-items:center; }
+  #digiaura-view .da-intro .wrap { display:grid; grid-template-columns:.92fr 1.08fr; gap:40px; align-items:center; }
+  #pexminer-view .pm-intro .wrap { display:grid; grid-template-columns:.92fr 1.08fr; gap:40px; align-items:center; }
+  #digivox-view .dv-intro h2 { font-size:clamp(26px,3vw,40px); line-height:1.02; font-weight:600; }
+  #digivox-view .dv-intro .line2 { color:var(--text-dim); }
+  #digivox-view .dv-logo-sm { height:24px; width:auto; margin-bottom:16px; }
+  #digivox-view .stat-row, #elevaite-view .stat-row, #digikoach-view .stat-row, #pexminer-view .stat-row, #digiaura-view .stat-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 200px)); justify-content:start; gap:clamp(16px,2.2vw,28px); margin-top:44px; }
+  #digivox-view .stat, #elevaite-view .stat, #digikoach-view .stat, #pexminer-view .stat, #digiaura-view .stat {
+    position:relative; overflow:hidden; min-width:150px;
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:22px 22px 20px; transition:transform .3s ease, border-color .3s ease, background .3s ease;
+  }
+  #digivox-view .stat::before, #elevaite-view .stat::before, #digikoach-view .stat::before, #pexminer-view .stat::before, #digiaura-view .stat::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg, var(--ember), var(--gold));
+  }
+  #digivox-view .stat:hover, #elevaite-view .stat:hover, #digikoach-view .stat:hover, #pexminer-view .stat:hover, #digiaura-view .stat:hover { transform:translateY(-5px); border-color:var(--ember); background:var(--surface-2); }
+  #elevaite-view .stat::before { background:linear-gradient(90deg, var(--gold), var(--ember)); }
+  #elevaite-view .stat:hover { border-color:var(--gold); }
+  #digivox-view .stat b, #elevaite-view .stat b, #digikoach-view .stat b, #pexminer-view .stat b, #digiaura-view .stat b { font-family:'Space Grotesk'; font-size:clamp(20px,1.8vw,28px); display:block; margin-bottom:8px; }
+  #digivox-view .stat span, #elevaite-view .stat span, #digikoach-view .stat span, #pexminer-view .stat span, #digiaura-view .stat span { font-size:11.5px; color:var(--text-faint); line-height:1.4; display:block; }
+  #digivox-view .orb-stage { position:relative; aspect-ratio:1/1; max-height:66vh; width:100%; justify-self:center; }
+  #digivox-view .dv-brain-bg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72%; height:72%; object-fit:contain; z-index:1; opacity:.2; }
+  #digivox-view .dv-logo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:46%; max-width:340px; height:auto; z-index:3; pointer-events:none; filter:drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  #digivox-view .orb-caption { position:absolute; bottom:6%; left:50%; transform:translateX(-50%); font-size:11px; color:var(--text-faint); font-family:'JetBrains Mono'; letter-spacing:.04em; text-align:center; white-space:nowrap; }
+  #digikoach-view .orb-stage { position:relative; aspect-ratio:1/1; max-height:66vh; width:100%; justify-self:center; }
+  #digikoach-view .dv-brain-bg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72%; height:72%; object-fit:contain; z-index:1; opacity:.3; }
+  #digikoach-view .dv-logo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:46%; max-width:340px; height:auto; z-index:3; pointer-events:none; filter:drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  #pexminer-view .orb-stage { position:relative; aspect-ratio:1/1; max-height:66vh; width:100%; justify-self:center; }
+  #pexminer-view .dv-brain-bg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72%; height:72%; object-fit:contain; z-index:1; opacity:.2; }
+  #pexminer-view .dv-logo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:46%; max-width:340px; height:auto; z-index:3; pointer-events:none; filter:drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  #pexminer-view .orb-caption { position:absolute; bottom:6%; left:50%; transform:translateX(-50%); font-size:11px; color:var(--text-faint); font-family:'JetBrains Mono'; letter-spacing:.04em; text-align:center; white-space:nowrap; }
+  #digiaura-view .orb-stage { position:relative; aspect-ratio:1/1; max-height:66vh; width:100%; justify-self:center; }
+  #digiaura-view .dv-brain-bg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72%; height:72%; object-fit:contain; z-index:1; opacity:.2; }
+  #digiaura-view .dv-logo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:46%; max-width:340px; height:auto; z-index:3; pointer-events:none; filter:drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  #elevaite-view .flow-stage { position:relative; aspect-ratio:1/1; max-height:66vh; width:100%; justify-self:center; }
+  #elevaite-view .ev-flow-bg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72%; height:72%; object-fit:contain; z-index:1; opacity:.2; }
+  #elevaite-view .ev-logo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:44%; max-width:320px; height:auto; z-index:3; pointer-events:none; filter:drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  #elevaite-view .flow-caption { position:absolute; bottom:6%; left:50%; transform:translateX(-50%); font-size:11px; color:var(--text-faint); font-family:'JetBrains Mono'; letter-spacing:.04em; text-align:center; white-space:nowrap; }
+  /* ---------- HIGHLIGHT LIST (was a stacked "card" look — flattened into
+     a clean icon + hairline-divider list instead, so three short facts
+     read as a quick scan, not three separate boxes competing for
+     attention) ---------- */
+  #elevaite-view .bullet-list { margin-top:24px; display:flex; flex-direction:column; }
+  #elevaite-view .bullet-list li {
+    list-style:none; display:flex; align-items:flex-start; gap:14px;
+    padding:16px 2px; font-size:14.5px; color:var(--text-dim); line-height:1.55;
+    border-bottom:1px solid var(--line);
+    transition:padding-left var(--dur-hover) var(--ease-hover), color var(--dur-hover) var(--ease-hover), border-color var(--dur-hover) var(--ease-hover);
+  }
+  #elevaite-view .bullet-list li:last-child { border-bottom:none; }
+  #elevaite-view .bullet-list li::before {
+    content:''; flex:none; width:20px; height:20px; margin-top:2px; border-radius:50%;
+    background:linear-gradient(120deg,var(--ember),var(--gold)); /* fixed brand color — intentionally NOT tied to the per-product --accent-a/--accent-b, which shift per product */
+    -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/60% no-repeat;
+    mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/60% no-repeat;
+  }
+  #elevaite-view .bullet-list li:hover { color:var(--text); padding-left:8px; border-color:var(--line-strong); }
+  #elevaite-view .bullet-list li b { color:var(--text); font-weight:700; }
+
+  #digivox-view #dv-why .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digivox-view #dv-how .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digivox-view #dv-report .report-shots-row { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; margin-top:32px; }
+  #digikoach-view #dk-why .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digikoach-view #dk-features .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #pexminer-view #pm-why .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #pexminer-view #pm-features .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #pexminer-view #pm-results .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digiaura-view #da-why .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digiaura-view #da-features .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digiaura-view #da-results .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digikoach-view .bullet-list, #pexminer-view .bullet-list, #digiaura-view .bullet-list { margin-top:24px; display:flex; flex-direction:column; }
+  #digikoach-view .bullet-list li, #pexminer-view .bullet-list li, #digiaura-view .bullet-list li {
+    list-style:none; display:flex; align-items:flex-start; gap:14px;
+    padding:16px 2px; font-size:14.5px; color:var(--text-dim); line-height:1.55;
+    border-bottom:1px solid var(--line);
+    transition:padding-left var(--dur-hover) var(--ease-hover), color var(--dur-hover) var(--ease-hover), border-color var(--dur-hover) var(--ease-hover);
+  }
+  #digikoach-view .bullet-list li:last-child, #pexminer-view .bullet-list li:last-child, #digiaura-view .bullet-list li:last-child { border-bottom:none; }
+  #digikoach-view .bullet-list li::before, #pexminer-view .bullet-list li::before, #digiaura-view .bullet-list li::before {
+    content:''; flex:none; width:20px; height:20px; margin-top:2px; border-radius:50%;
+    background:linear-gradient(120deg,var(--ember),var(--gold)); /* fixed brand color — intentionally NOT tied to the per-product --accent-a/--accent-b, which shift per product */
+    -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/60% no-repeat;
+    mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/60% no-repeat;
+  }
+  #digikoach-view .bullet-list li:hover, #pexminer-view .bullet-list li:hover, #digiaura-view .bullet-list li:hover { color:var(--text); padding-left:8px; border-color:var(--line-strong); }
+  #digikoach-view .bullet-list li b, #pexminer-view .bullet-list li b, #digiaura-view .bullet-list li b { color:var(--text); font-weight:700; }
+  #digikoach-view #dk-results .wrap { display:grid; grid-template-columns:.95fr 1.05fr; gap:52px; align-items:center; }
+  #digikoach-view .dk-report-shots, #elevaite-view .dk-report-shots, #pexminer-view .dk-report-shots, #digiaura-view .dk-report-shots { position:relative; height:min(58vh, 500px); max-width:640px; margin-top:24px; }
+  #digikoach-view .dk-report-shot, #elevaite-view .dk-report-shot, #pexminer-view .dk-report-shot, #digiaura-view .dk-report-shot { position:absolute; width:92%; border-radius:16px; box-shadow:0 30px 70px rgba(0,0,0,.55); }
+  #digikoach-view .dk-report-shot .shot-frame, #elevaite-view .dk-report-shot .shot-frame, #pexminer-view .dk-report-shot .shot-frame, #digiaura-view .dk-report-shot .shot-frame { border-radius:16px; }
+  #digikoach-view .dk-report-shot.shot-a, #elevaite-view .dk-report-shot.shot-a, #pexminer-view .dk-report-shot.shot-a, #digiaura-view .dk-report-shot.shot-a { top:0; left:0; animation:dkReportShotA 9s ease-in-out infinite; }
+  #digikoach-view .dk-report-shot.shot-b, #elevaite-view .dk-report-shot.shot-b, #pexminer-view .dk-report-shot.shot-b, #digiaura-view .dk-report-shot.shot-b { bottom:0; right:0; animation:dkReportShotB 9s ease-in-out infinite; }
+  @keyframes dkReportShotA {
+    0%, 42%  { transform:rotate(-2.5deg) scale(1) translate(0,0); z-index:2; box-shadow:0 30px 70px rgba(0,0,0,.55); }
+    50%, 92% { transform:rotate(-2.5deg) scale(.9) translate(16px,16px); z-index:1; box-shadow:0 14px 30px rgba(0,0,0,.35); }
+    100%     { transform:rotate(-2.5deg) scale(1) translate(0,0); z-index:2; box-shadow:0 30px 70px rgba(0,0,0,.55); }
+  }
+  @keyframes dkReportShotB {
+    0%, 42%  { transform:rotate(2.5deg) scale(.9) translate(-16px,-16px); z-index:1; box-shadow:0 14px 30px rgba(0,0,0,.35); }
+    50%, 92% { transform:rotate(2.5deg) scale(1) translate(0,0); z-index:2; box-shadow:0 30px 70px rgba(0,0,0,.55); }
+    100%     { transform:rotate(2.5deg) scale(.9) translate(-16px,-16px); z-index:1; box-shadow:0 14px 30px rgba(0,0,0,.35); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #digikoach-view .dk-report-shot.shot-a, #digikoach-view .dk-report-shot.shot-b, #elevaite-view .dk-report-shot.shot-a, #elevaite-view .dk-report-shot.shot-b, #pexminer-view .dk-report-shot.shot-a, #pexminer-view .dk-report-shot.shot-b, #digiaura-view .dk-report-shot.shot-a, #digiaura-view .dk-report-shot.shot-b { animation:none; }
+    #digikoach-view .dk-report-shot.shot-a, #elevaite-view .dk-report-shot.shot-a, #pexminer-view .dk-report-shot.shot-a, #digiaura-view .dk-report-shot.shot-a { transform:rotate(-2.5deg); z-index:2; }
+    #digikoach-view .dk-report-shot.shot-b, #elevaite-view .dk-report-shot.shot-b, #pexminer-view .dk-report-shot.shot-b, #digiaura-view .dk-report-shot.shot-b { transform:rotate(2.5deg); z-index:1; }
+  }
+  #digivox-view #dv-report .report-shot-col { display:flex; flex-direction:column; gap:16px; }
+  /* small numbered dot sitting directly on the screenshot, pointing at the
+     relevant panel — kept tiny and edge-anchored so it never obscures the
+     UI it's pointing to; the actual description lives in the legend below,
+     never on top of the image, so it can never overlap the screenshot. */
+  #digivox-view #dv-report .callout-num {
+    position:absolute; transform:translate(-50%,-50%); z-index:5;
+    width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:#181109;
+    background:linear-gradient(120deg,var(--ember),var(--gold)); box-shadow:0 0 0 4px rgba(242,102,28,.22), 0 6px 14px rgba(0,0,0,.4);
+  }
+  #digivox-view #dv-report .callout-num::before {
+    content:''; position:absolute; inset:-6px; border-radius:50%; border:1.5px solid var(--ember);
+    animation:dvCalloutPulse 2.2s ease-out infinite;
+  }
+  @keyframes dvCalloutPulse {
+    0%   { transform:scale(.75); opacity:1; }
+    100% { transform:scale(1.7); opacity:0; }
+  }
+  #digivox-view #dv-report .callout-num.static { position:static; transform:none; flex:none; }
+  #digivox-view #dv-report .callout-num.static::before { display:none; }
+  #digivox-view #dv-report .callout-legend { position:relative; display:flex; flex-wrap:wrap; gap:14px 10px; padding:6px 4px 18px; }
+  #digivox-view #dv-report .callout-legend div {
+    display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--text-dim); font-weight:500;
+    background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:9px 14px 9px 9px;
+    box-shadow:0 10px 22px rgba(0,0,0,.35); transition:transform .25s ease, border-color .25s ease;
+  }
+  #digivox-view #dv-report .callout-legend div:hover { border-color:var(--ember); transform:translateY(-3px) rotate(0deg) !important; }
+  #digivox-view #dv-report .callout-legend div:nth-child(1) { transform:rotate(-3deg) translateY(2px); }
+  #digivox-view #dv-report .callout-legend div:nth-child(2) { transform:rotate(2.5deg) translateY(-4px); }
+  #digivox-view #dv-report .callout-legend div:nth-child(3) { transform:rotate(-1.5deg) translateY(6px); }
+  @media (prefers-reduced-motion: reduce){ #digivox-view #dv-report .callout-num::before { animation:none; } }
+  #digivox-view .quote-block p, #elevaite-view .quote-block p, #digikoach-view .quote-block p, #pexminer-view .quote-block p, #digiaura-view .quote-block p { font-size:clamp(19px,2.3vw,28px); line-height:1.35; font-family:'Space Grotesk'; font-weight:500; }
+  #digivox-view .pain-grid, #elevaite-view .pain-grid, #digikoach-view .pain-grid, #pexminer-view .pain-grid, #digiaura-view .pain-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:28px; }
+  #digivox-view .pain-card, #elevaite-view .pain-card, #digikoach-view .pain-card, #pexminer-view .pain-card, #digiaura-view .pain-card { border:1px solid var(--line); border-radius:16px; padding:18px; background:var(--surface); }
+  #digivox-view .pain-card b, #elevaite-view .pain-card b, #digikoach-view .pain-card b, #pexminer-view .pain-card b, #digiaura-view .pain-card b { display:block; font-size:17px; line-height:1.18; font-family:'Space Grotesk'; margin-bottom:6px; color:var(--ember); }
+  #digivox-view .pain-card span, #elevaite-view .pain-card span, #digikoach-view .pain-card span, #pexminer-view .pain-card span, #digiaura-view .pain-card span { font-size:12.5px; color:var(--text-dim); }
+
+  #digivox-view .tilt-card, #elevaite-view .tilt-card, #digikoach-view .tilt-card, #pexminer-view .tilt-card, #digiaura-view .tilt-card { perspective:1400px; }
+  #digivox-view .shot-frame, #elevaite-view .shot-frame, #digikoach-view .shot-frame, #pexminer-view .shot-frame, #digiaura-view .shot-frame { border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:var(--shadow); background:var(--surface); max-width:none; }
+  #digivox-view .shot-frame .fbar, #elevaite-view .shot-frame .fbar, #digikoach-view .shot-frame .fbar, #pexminer-view .shot-frame .fbar, #digiaura-view .shot-frame .fbar { height:32px; background:var(--surface-2); display:flex; align-items:center; gap:6px; padding:0 14px; border-bottom:1px solid var(--line); }
+  #digivox-view .shot-frame .fbar span, #elevaite-view .shot-frame .fbar span, #digikoach-view .shot-frame .fbar span, #pexminer-view .shot-frame .fbar span, #digiaura-view .shot-frame .fbar span { width:8px; height:8px; border-radius:50%; background:var(--line-strong); }
+  #digivox-view .shot-frame img, #elevaite-view .shot-frame img, #digikoach-view .shot-frame img, #pexminer-view .shot-frame img, #digiaura-view .shot-frame img { display:block; width:100%; height:auto; }
+  #digivox-view .peek-shot { position:absolute; width:50%; top:-11%; right:-11%; z-index:-1; border-radius:16px; overflow:hidden; border:1px solid var(--line); box-shadow:var(--shadow); transform:rotate(7deg); opacity:.9; background:var(--surface); }
+  #digivox-view .peek-shot img { display:block; width:100%; }
+  @media (max-width:1080px){ #digivox-view .peek-shot { display:none; } }
+  @media (max-width:900px){ #digivox-view #dv-report::before { opacity:.08; background-size:70% auto; } }
+  #digivox-view .float-tag, #elevaite-view .float-tag, #digikoach-view .float-tag, #pexminer-view .float-tag, #digiaura-view .float-tag { position:absolute; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:8px 12px; font-size:11.5px; box-shadow:var(--shadow); display:flex; gap:8px; align-items:center; }
+  #digivox-view .float-tag i, #elevaite-view .float-tag i, #digikoach-view .float-tag i, #pexminer-view .float-tag i, #digiaura-view .float-tag i { width:7px; height:7px; border-radius:50%; background:var(--scan); }
+  #digivox-view .chip-row, #elevaite-view .chip-row, #digikoach-view .chip-row, #pexminer-view .chip-row, #digiaura-view .chip-row { display:flex; align-items:center; gap:10px; margin-top:30px; flex-wrap:wrap; }
+
+  #digivox-view .persona-strip { display:flex; flex-direction:column; gap:10px; }
+  #digivox-view .persona { display:flex; gap:14px; align-items:center; border:1px solid var(--line); border-radius:16px; padding:12px 14px; cursor:pointer; background:var(--surface); transition:border-color .25s ease, background .25s ease; }
+  #digivox-view .persona.active { border-color:var(--ember); background:var(--surface-2); }
+  #digivox-view .av { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk'; font-weight:600; font-size:14px; color:#1a1208; flex-shrink:0; }
+  #digivox-view .persona .meta b { display:block; font-size:14px; }
+  #digivox-view .persona .meta span { font-size:11.5px; color:var(--text-dim); }
+  #digivox-view .tuner { border:1px solid var(--line); border-radius:20px; padding:22px 26px 26px; background:var(--surface); }
+  #digivox-view .slider-row { margin-bottom:18px; }
+  #digivox-view .slider-row .top { display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:8px; }
+  #digivox-view .slider-row .top b { font-weight:500; }
+  #digivox-view .slider-row .top .val { font-family:'JetBrains Mono'; color:var(--ember); }
+  #digivox-view input[type=range] { -webkit-appearance:none; width:100%; height:4px; border-radius:3px; background:var(--line-strong); outline:none; }
+  #digivox-view input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--ember); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--ember); cursor:pointer; }
+  #digivox-view .eq { display:flex; align-items:flex-end; gap:4px; height:54px; margin-top:22px; }
+  #digivox-view .eq span { width:100%; border-radius:3px 3px 0 0; background:linear-gradient(180deg,var(--gold),var(--scan)); }
+
+  #digivox-view .ring-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  #digivox-view .ring-card { border:1px solid var(--line); border-radius:18px; padding:18px; background:var(--surface); display:flex; flex-direction:column; align-items:center; gap:8px; }
+  #digivox-view .ring-card svg { width:84px; height:84px; }
+  #digivox-view .ring-card b { font-family:'Space Grotesk'; font-size:12.5px; }
+  #digivox-view .ring-card .num { font-family:'JetBrains Mono'; font-size:20px; }
+  #digivox-view .level-tags { display:flex; gap:8px; margin-top:20px; }
+
+  #digivox-view #dv-report { position:relative; overflow:hidden; }
+  #digivox-view #dv-report::before {
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+    background-image:url('https://aurora.growatiopex.com/sites/default/files/2026-09/incproctor.png'); background-repeat:no-repeat;
+    background-position:right -4% center; background-size:52% auto;
+    opacity:.14;
+    -webkit-mask-image:linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,.55) 42%, transparent 78%);
+    mask-image:linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,.55) 42%, transparent 78%);
+  }
+  
+  #digivox-view #dv-report .wrap { position:relative; z-index:1; }
+  @property --beam-angle{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+  /* shared "border beam" animation — a thin rotating gradient arc traveling
+     around the border, applied to every info/stat card across every slide */
+  #digivox-view .cap-card, #elevaite-view .cap-card, #digikoach-view .cap-card, #pexminer-view .cap-card, #digiaura-view .cap-card, #digikoach-view .cap-card, #digivox-view .pain-card, #elevaite-view .pain-card, #digikoach-view .pain-card, #pexminer-view .pain-card, #digiaura-view .pain-card, #digikoach-view .pain-card, #digivox-view .persona, #digivox-view .tuner, #digivox-view .ring-card, #digivox-view .benefit, #elevaite-view .benefit, #digikoach-view .benefit, #pexminer-view .benefit, #digiaura-view .benefit {
+    position:relative; overflow:hidden;
+  }
+  #digivox-view .cap-card::before, #elevaite-view .cap-card::before, #digikoach-view .cap-card::before, #pexminer-view .cap-card::before, #digiaura-view .cap-card::before, #digivox-view .pain-card::before, #elevaite-view .pain-card::before, #digikoach-view .pain-card::before, #pexminer-view .pain-card::before, #digiaura-view .pain-card::before, #digivox-view .persona::before, #digivox-view .tuner::before, #digivox-view .ring-card::before, #digivox-view .benefit::before, #elevaite-view .benefit::before, #digikoach-view .benefit::before, #pexminer-view .benefit::before, #digiaura-view .benefit::before {
+    content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px;
+    background:conic-gradient(from var(--beam-angle), transparent 0%, transparent 78%, var(--ember) 86%, var(--gold) 92%, var(--scan) 97%, transparent 100%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    animation:beam-spin 4.5s linear infinite;
+    pointer-events:none;
+  }
+  /* stagger so a row of cards doesn't all pulse in lockstep */
+  #digivox-view .pain-grid .pain-card:nth-child(2)::before, #elevaite-view .pain-grid .pain-card:nth-child(2)::before, #digikoach-view .pain-grid .pain-card:nth-child(2)::before, #pexminer-view .pain-grid .pain-card:nth-child(2)::before, #digiaura-view .pain-grid .pain-card:nth-child(2)::before { animation-delay:-1.1s; }
+  #digivox-view .pain-grid .pain-card:nth-child(3)::before, #elevaite-view .pain-grid .pain-card:nth-child(3)::before, #digikoach-view .pain-grid .pain-card:nth-child(3)::before, #pexminer-view .pain-grid .pain-card:nth-child(3)::before, #digiaura-view .pain-grid .pain-card:nth-child(3)::before { animation-delay:-2.2s; }
+  #digivox-view .pain-grid .pain-card:nth-child(4)::before, #elevaite-view .pain-grid .pain-card:nth-child(4)::before, #digikoach-view .pain-grid .pain-card:nth-child(4)::before, #pexminer-view .pain-grid .pain-card:nth-child(4)::before, #digiaura-view .pain-grid .pain-card:nth-child(4)::before { animation-delay:-3.3s; }
+  #digivox-view .persona-strip .persona:nth-child(2)::before { animation-delay:-1.1s; }
+  #digivox-view .persona-strip .persona:nth-child(3)::before { animation-delay:-2.2s; }
+  #digivox-view .persona-strip .persona:nth-child(4)::before { animation-delay:-3.3s; }
+  #digivox-view .ring-grid .ring-card:nth-child(2)::before { animation-delay:-2.2s; }
+  #digivox-view .benefit-grid .benefit:nth-child(2)::before, #elevaite-view .benefit-grid .benefit:nth-child(2)::before, #digikoach-view .benefit-grid .benefit:nth-child(2)::before, #pexminer-view .benefit-grid .benefit:nth-child(2)::before, #digiaura-view .benefit-grid .benefit:nth-child(2)::before { animation-delay:-0.9s; }
+  #digivox-view .benefit-grid .benefit:nth-child(3)::before, #elevaite-view .benefit-grid .benefit:nth-child(3)::before, #digikoach-view .benefit-grid .benefit:nth-child(3)::before, #pexminer-view .benefit-grid .benefit:nth-child(3)::before, #digiaura-view .benefit-grid .benefit:nth-child(3)::before { animation-delay:-1.8s; }
+  #digivox-view .benefit-grid .benefit:nth-child(4)::before, #elevaite-view .benefit-grid .benefit:nth-child(4)::before, #digikoach-view .benefit-grid .benefit:nth-child(4)::before, #pexminer-view .benefit-grid .benefit:nth-child(4)::before, #digiaura-view .benefit-grid .benefit:nth-child(4)::before { animation-delay:-2.7s; }
+  #digivox-view .benefit-grid .benefit:nth-child(5)::before, #elevaite-view .benefit-grid .benefit:nth-child(5)::before, #digikoach-view .benefit-grid .benefit:nth-child(5)::before, #pexminer-view .benefit-grid .benefit:nth-child(5)::before, #digiaura-view .benefit-grid .benefit:nth-child(5)::before { animation-delay:-3.6s; }
+  @keyframes beam-spin{ to{ --beam-angle:360deg; } }
+  @media (prefers-reduced-motion: reduce){
+    #digivox-view .cap-card::before, #elevaite-view .cap-card::before, #digikoach-view .cap-card::before, #pexminer-view .cap-card::before, #digiaura-view .cap-card::before, #digivox-view .pain-card::before, #elevaite-view .pain-card::before, #digikoach-view .pain-card::before, #pexminer-view .pain-card::before, #digiaura-view .pain-card::before, #digivox-view .persona::before, #digivox-view .tuner::before, #digivox-view .ring-card::before, #digivox-view .benefit::before, #elevaite-view .benefit::before, #digikoach-view .benefit::before, #pexminer-view .benefit::before, #digiaura-view .benefit::before { animation:none; }
+  }
+  #digivox-view .cap-card, #elevaite-view .cap-card, #digikoach-view .cap-card, #pexminer-view .cap-card, #digiaura-view .cap-card {
+    border:1px solid var(--line); border-radius:18px;
+    padding:22px 20px; background:var(--surface);
+    transition:transform .35s ease, border-color .35s ease, background .35s ease;
+  }
+  #digivox-view .cap-card:hover, #elevaite-view .cap-card:hover, #digikoach-view .cap-card:hover, #pexminer-view .cap-card:hover, #digiaura-view .cap-card:hover { transform:translateY(-6px); border-color:var(--ember); background:var(--surface-2); }
+  #digivox-view .cap-num, #elevaite-view .cap-num, #digikoach-view .cap-num, #pexminer-view .cap-num, #digiaura-view .cap-num { font-family:'JetBrains Mono'; font-size:11px; color:var(--ember); margin-bottom:14px; display:block; }
+  #digivox-view .cap-card h3, #elevaite-view .cap-card h3, #digikoach-view .cap-card h3, #pexminer-view .cap-card h3, #digiaura-view .cap-card h3 { font-size:16.5px; margin-bottom:10px; }
+  #digivox-view .cap-card p, #elevaite-view .cap-card p, #digikoach-view .cap-card p, #pexminer-view .cap-card p, #digiaura-view .cap-card p { font-size:12.5px; color:var(--text-dim); line-height:1.55; }
+
+  #digivox-view .benefit, #elevaite-view .benefit, #digikoach-view .benefit, #pexminer-view .benefit, #digiaura-view .benefit { border:1px solid var(--line); border-radius:18px; padding:20px 16px; text-align:left; background:var(--surface); }
+  #digivox-view .benefit .ico, #elevaite-view .benefit .ico, #digikoach-view .benefit .ico, #pexminer-view .benefit .ico, #digiaura-view .benefit .ico { width:34px; height:34px; border-radius:10px; border:1px solid rgba(242,102,28,.25); background:rgba(242,102,28,.07); display:flex; align-items:center; justify-content:center; margin-bottom:16px; flex-shrink:0; }
+  #digivox-view .benefit .ico svg, #elevaite-view .benefit .ico svg, #digikoach-view .benefit .ico svg, #pexminer-view .benefit .ico svg, #digiaura-view .benefit .ico svg { width:18px; height:18px; stroke:var(--ember); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  #elevaite-view .benefit.gold .ico { border-color:rgba(255,200,69,.28); background:rgba(255,200,69,.08); }
+  #elevaite-view .benefit.gold .ico svg { stroke:var(--gold); }
+  #elevaite-view .cap-card.gold:hover { border-color:var(--gold); }
+  #elevaite-view .cap-card.gold .cap-num { color:var(--gold); }
+  #digivox-view .benefit b, #elevaite-view .benefit b, #digikoach-view .benefit b, #pexminer-view .benefit b, #digiaura-view .benefit b { display:block; font-size:14px; margin-bottom:6px; }
+  #digivox-view .benefit span, #elevaite-view .benefit span, #digikoach-view .benefit span, #pexminer-view .benefit span, #digiaura-view .benefit span { font-size:11.5px; color:var(--text-dim); line-height:1.5; }
+
+  #digivox-view .dv-cta { position:relative; overflow:hidden; text-align:center; border-top:1px solid var(--line); }
+  #digivox-view .dv-cta h2 { font-size:clamp(28px,4vw,48px); font-weight:600; }
+  #digivox-view .dv-cta .hero-cta { margin-top:26px; }
+  #digivox-view .dv-cta::before {
+    content:''; position:absolute; inset:-20% -10%; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(38% 55% at 22% 30%, rgba(242,102,28,.16), transparent 70%),
+      radial-gradient(34% 50% at 78% 65%, rgba(255,200,69,.13), transparent 70%),
+      radial-gradient(30% 46% at 50% 85%, rgba(51,216,194,.10), transparent 70%);
+    filter:blur(60px);
+    animation:aurora-drift 22s ease-in-out infinite alternate;
+  }
+  
+  @keyframes aurora-drift{
+    0%{ transform:translate3d(0,0,0) scale(1); }
+    50%{ transform:translate3d(2%,-3%,0) scale(1.08); }
+    100%{ transform:translate3d(-3%,2%,0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce){ #digivox-view .dv-cta::before { animation:none; } }
+  #digivox-view .dv-cta .wrap { position:relative; z-index:1; }
+
+  @media (max-width:1080px){
+    #digivox-view .dv-intro .wrap, #digivox-view #dv-why .wrap, #digivox-view #dv-how .wrap { grid-template-columns:1fr !important; gap:34px; }
+    #elevaite-view .ev-intro .wrap { grid-template-columns:1fr !important; gap:34px; }
+    #digikoach-view .dk-intro .wrap, #digikoach-view #dk-why .wrap, #digikoach-view #dk-results .wrap, #digikoach-view #dk-features .wrap { grid-template-columns:1fr !important; gap:34px; }
+    #pexminer-view .pm-intro .wrap, #pexminer-view #pm-why .wrap, #pexminer-view #pm-features .wrap, #pexminer-view #pm-results .wrap { grid-template-columns:1fr !important; gap:34px; }
+    #digiaura-view .da-intro .wrap, #digiaura-view #da-why .wrap, #digiaura-view #da-features .wrap, #digiaura-view #da-results .wrap { grid-template-columns:1fr !important; gap:34px; }
+    #digivox-view .orb-stage { order:-1; max-height:46vh; }
+    #digikoach-view .orb-stage { order:-1; max-height:46vh; }
+    #pexminer-view .orb-stage { order:-1; max-height:46vh; }
+    #digiaura-view .orb-stage { order:-1; max-height:46vh; }
+    #elevaite-view .flow-stage { order:-1; max-height:46vh; }
+    #elevaite-view .ev-intro .wrap, #elevaite-view #ev-why .wrap, #elevaite-view #ev-features .wrap, #elevaite-view #ev-results .wrap { grid-template-columns:1fr !important; gap:34px; }
+  }
+  @media (max-width:640px){
+    #digivox-view #dv-report .report-shots-row { grid-template-columns:1fr; }
+    #digikoach-view .dk-report-shots, #elevaite-view .dk-report-shots, #pexminer-view .dk-report-shots, #digiaura-view .dk-report-shots { position:static; height:auto; display:flex; flex-direction:column; gap:20px; margin-top:24px; }
+    #digikoach-view .dk-report-shot, #elevaite-view .dk-report-shot, #pexminer-view .dk-report-shot, #digiaura-view .dk-report-shot { position:static; width:100%; animation:none !important; transform:none !important; box-shadow:0 20px 40px rgba(0,0,0,.4); }
+    #digivox-view .pain-grid, #elevaite-view .pain-grid, #digikoach-view .pain-grid, #pexminer-view .pain-grid, #digiaura-view .pain-grid { grid-template-columns:1fr; }
+  }
+
+  /* -------- FOOTER -------- */
+  
+  #digivox-view .foot-row { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:30px; }
+  #digivox-view .foot-links { display:flex; gap:34px; font-size:13px; color:var(--text-dim); }
+  #digivox-view .foot-links a:hover { color:var(--iopex); }
+  #digivox-view .foot-meta { font-size:11.5px; color:var(--text-faint); margin-top:10px; }
+
+  @media (max-width:640px){ #digivox-view .btn-ghost, #elevaite-view .btn-ghost, #digikoach-view .btn-ghost, #pexminer-view .btn-ghost, #digiaura-view .btn-ghost { display:none; } #digivox-view .fact-row, #elevaite-view .fact-row, #digikoach-view .fact-row, #pexminer-view .fact-row, #digiaura-view .fact-row { gap:22px; } }
+
+  /* ============================================================
+     KIOSK SHELL — turns the sections above into full-screen slides
+     without changing any of their internal design.
+  ============================================================ */
+  
+  
+   /* credit line folded into the kiosk bottom bar */
+
+  #digivox-view .k-viewport, #elevaite-view .k-viewport, #digikoach-view .k-viewport, #pexminer-view .k-viewport, #digiaura-view .k-viewport { position:fixed; inset:0; z-index:5; overflow:hidden; perspective:1400px; }
+  #digivox-view .k-track, #elevaite-view .k-track, #digikoach-view .k-track, #pexminer-view .k-track, #digiaura-view .k-track { position:relative; width:100%; height:100%; }
+  /* Framer-Motion-style animated transition: each slide is an independently
+     animated layer (crossfade + slide + scale + blur) instead of one long
+     filmstrip sliding sideways — closer to an AnimatePresence page transition. */
+  #digivox-view .k-slide, #elevaite-view .k-slide, #digikoach-view .k-slide, #pexminer-view .k-slide, #digiaura-view .k-slide {
+    position:absolute; inset:0; width:100%; height:100%; overflow-y:auto;
+    scrollbar-width:none; -ms-overflow-style:none;
+    display:flex; align-items:center;
+    /* on a shorter laptop screen, a content-heavy slide (like elevAIte's
+       "Why" slide — heading + 3 bullets + a second heading + 3 cards) can
+       be taller than the viewport. Plain "align-items:center" has a classic
+       flexbox bug in this situation: it clips BOTH the top and bottom of
+       the overflowing content and makes the clipped parts unreachable even
+       via scroll, which is exactly what showed up on that laptop screenshot
+       — the eyebrow line clipped at the top, the phase cards clipped at
+       the bottom. "safe center" is the standard fix: it centers normally
+       whenever the content fits (so nothing changes on a large display,
+       where this content already fits with room to spare) but falls back
+       to top-aligned + scrollable the moment it doesn't fit, so the
+       overflow-y:auto above can actually reach every part of the slide.
+       Declared as a second line so unsupporting browsers just keep plain
+       "center" instead of getting an invalid value. */
+    align-items:safe center;
+    opacity:0; pointer-events:none; z-index:1;
+    transform:translate3d(0,0,0) scale(.94);
+    filter:blur(10px);
+    transition:transform .68s cubic-bezier(.22,.9,.28,1), opacity .5s ease, filter .5s ease;
+    will-change:transform, opacity, filter;
+  }
+  #digivox-view .k-slide::-webkit-scrollbar, #elevaite-view .k-slide::-webkit-scrollbar, #digikoach-view .k-slide::-webkit-scrollbar, #pexminer-view .k-slide::-webkit-scrollbar, #digiaura-view .k-slide::-webkit-scrollbar { display:none; width:0; height:0; }
+  #digivox-view .k-slide.active, #elevaite-view .k-slide.active, #digikoach-view .k-slide.active, #pexminer-view .k-slide.active, #digiaura-view .k-slide.active { opacity:1; pointer-events:auto; z-index:3; transform:translate3d(0,0,0) scale(1); filter:blur(0px); }
+  #digivox-view .k-slide.k-exit-left, #elevaite-view .k-slide.k-exit-left, #digikoach-view .k-slide.k-exit-left, #pexminer-view .k-slide.k-exit-left, #digiaura-view .k-slide.k-exit-left { opacity:0; z-index:2; transform:translate3d(-5%,0,0) scale(.94); filter:blur(10px); }
+  #digivox-view .k-slide.k-exit-right, #elevaite-view .k-slide.k-exit-right, #digikoach-view .k-slide.k-exit-right, #pexminer-view .k-slide.k-exit-right, #digiaura-view .k-slide.k-exit-right { opacity:0; z-index:2; transform:translate3d(5%,0,0) scale(.94); filter:blur(10px); }
+  #digivox-view .k-slide.k-enter-left, #elevaite-view .k-slide.k-enter-left, #digikoach-view .k-slide.k-enter-left, #pexminer-view .k-slide.k-enter-left, #digiaura-view .k-slide.k-enter-left { transform:translate3d(-6%,0,0) scale(.94); filter:blur(10px); }
+  #digivox-view .k-slide.k-enter-right, #elevaite-view .k-slide.k-enter-right, #digikoach-view .k-slide.k-enter-right, #pexminer-view .k-slide.k-enter-right, #digiaura-view .k-slide.k-enter-right { transform:translate3d(6%,0,0) scale(.94); filter:blur(10px); }
+  @media (prefers-reduced-motion: reduce){
+    #digivox-view .k-slide, #elevaite-view .k-slide, #digikoach-view .k-slide, #pexminer-view .k-slide, #digiaura-view .k-slide, #digikoach-view .k-slide, #digivox-view .k-slide.active, #elevaite-view .k-slide.active, #digikoach-view .k-slide.active, #pexminer-view .k-slide.active, #digiaura-view .k-slide.active, #digikoach-view .k-slide.active, #digivox-view .k-slide.k-exit-left, #elevaite-view .k-slide.k-exit-left, #digikoach-view .k-slide.k-exit-left, #pexminer-view .k-slide.k-exit-left, #digiaura-view .k-slide.k-exit-left, #digikoach-view .k-slide.k-exit-left, #digivox-view .k-slide.k-exit-right, #elevaite-view .k-slide.k-exit-right, #digikoach-view .k-slide.k-exit-right, #pexminer-view .k-slide.k-exit-right, #digiaura-view .k-slide.k-exit-right, #digikoach-view .k-slide.k-exit-right, #digivox-view .k-slide.k-enter-left, #elevaite-view .k-slide.k-enter-left, #digikoach-view .k-slide.k-enter-left, #pexminer-view .k-slide.k-enter-left, #digiaura-view .k-slide.k-enter-left, #digikoach-view .k-slide.k-enter-left, #digivox-view .k-slide.k-enter-right, #elevaite-view .k-slide.k-enter-right, #digikoach-view .k-slide.k-enter-right, #pexminer-view .k-slide.k-enter-right, #digiaura-view .k-slide.k-enter-right {
+      transition:opacity .3s ease; filter:none; transform:none;
+    }
+  }
+  #digivox-view .k-slide .wrap, #elevaite-view .k-slide .wrap, #digikoach-view .k-slide .wrap, #pexminer-view .k-slide .wrap, #digiaura-view .k-slide .wrap { margin:auto; }
+  #digivox-view .k-slide.hero, #elevaite-view .k-slide.hero, #digikoach-view .k-slide.hero, #pexminer-view .k-slide.hero, #digiaura-view .k-slide.hero { min-height:0; padding-top:clamp(90px,13vh,150px); }
+  @media (min-height:900px) and (max-height:1140px){ #digivox-view .k-slide.hero, #elevaite-view .k-slide.hero, #digikoach-view .k-slide.hero, #pexminer-view .k-slide.hero, #digiaura-view .k-slide.hero { padding-top:clamp(110px,15vh,170px); } }
+
+  /* ---- LAPTOP-HEIGHT COMPACTION ----
+     A height query, not a width one — a large display is wide AND tall, so
+     this never fires there and that experience is untouched. It only
+     kicks in on the shorter viewports common to laptops (1366×768,
+     1440×900, 1536×864, …), where a content-heavy slide like elevAIte's
+     "Why" (heading + 3 bullets + a second heading + 3 cards, all in one
+     column) can be taller than the screen. Tightens vertical rhythm across
+     the board so more slides fit without needing to scroll at all; the
+     "align-items:safe center" fix above guarantees the rest is always at
+     least reachable by scrolling even if a slide still doesn't fully fit. */
+  @media (max-height:900px){
+    #digivox-view .eyebrow, #elevaite-view .eyebrow, #digikoach-view .eyebrow, #pexminer-view .eyebrow, #digiaura-view .eyebrow { margin-bottom:10px; font-size:18px; }
+    #digivox-view .h-title, #elevaite-view .h-title, #digikoach-view .h-title, #pexminer-view .h-title, #digiaura-view .h-title { font-size:clamp(18px,2.2vw,24px) !important; line-height:1.1 !important; }
+    #digivox-view .lede, #elevaite-view .lede, #digikoach-view .lede, #pexminer-view .lede, #digiaura-view .lede { margin-top:8px !important; }
+    #elevaite-view .bullet-list, #digikoach-view .bullet-list, #pexminer-view .bullet-list, #digiaura-view .bullet-list { margin-top:10px !important; }
+    #elevaite-view .bullet-list li, #digikoach-view .bullet-list li, #pexminer-view .bullet-list li, #digiaura-view .bullet-list li { padding:9px 2px; font-size:13px; line-height:1.35; }
+    #digivox-view .pain-grid, #elevaite-view .pain-grid, #digikoach-view .pain-grid, #pexminer-view .pain-grid, #digiaura-view .pain-grid { margin-top:12px !important; gap:10px; }
+    #digivox-view .pain-card, #elevaite-view .pain-card, #digikoach-view .pain-card, #pexminer-view .pain-card, #digiaura-view .pain-card { padding:12px; }
+    #digivox-view .pain-card b, #elevaite-view .pain-card b, #digikoach-view .pain-card b, #pexminer-view .pain-card b, #digiaura-view .pain-card b { font-size:14px; margin-bottom:3px; }
+    #digivox-view .pain-card span, #elevaite-view .pain-card span, #digikoach-view .pain-card span, #pexminer-view .pain-card span, #digiaura-view .pain-card span { font-size:11px; }
+    #digivox-view .stat-row, #elevaite-view .stat-row, #digikoach-view .stat-row, #pexminer-view .stat-row, #digiaura-view .stat-row { margin-top:20px; }
+  }
+
+  /* mode switch — sits in the existing header, left of the theme toggle */
+  .k-mode { position:relative; display:flex; align-items:center; border:1px solid var(--line-strong); border-radius:100px; padding:3px; background:var(--surface); gap:2px; }
+  .k-mode button { position:relative; z-index:1; padding:7px 14px; border-radius:100px; font-size:12.5px; font-weight:600; color:var(--text-dim); transition:color .3s ease; }
+  .k-mode button.active { color:#181109; }
+  .k-mode-thumb { position:absolute; top:3px; bottom:3px; left:3px; width:calc(50% - 3px); border-radius:100px; background:linear-gradient(120deg,var(--ember),var(--gold)); transition:transform .3s cubic-bezier(.3,.8,.3,1); z-index:0; }
+  .k-mode-icon button { width:38px; height:38px; padding:0; display:flex; align-items:center; justify-content:center; }
+  .k-mode-icon button svg { width:18px; height:18px; }
+  .k-mode-icon .k-mode-thumb { width:38px; height:38px; top:3px; bottom:auto; left:3px; }
+  .k-mode-2.mode-manual .k-mode-thumb { transform:translateX(0); }
+  .k-mode-2.mode-gesture .k-mode-thumb { transform:translateX(38px); }
+
+  /* transparent next/prev arrows */
+  #digivox-view .k-arrow, #elevaite-view .k-arrow, #digikoach-view .k-arrow, #pexminer-view .k-arrow, #digiaura-view .k-arrow { position:relative; z-index:70;
+    width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); backdrop-filter:blur(10px);
+    transition:background .25s ease, border-color .25s ease, transform .15s ease; pointer-events:auto;
+  }
+  #digivox-view .k-arrow:hover, #elevaite-view .k-arrow:hover, #digikoach-view .k-arrow:hover, #pexminer-view .k-arrow:hover, #digiaura-view .k-arrow:hover { background:rgba(242,102,28,.16); border-color:var(--ember); }
+  #digivox-view .k-arrow:active, #elevaite-view .k-arrow:active, #digikoach-view .k-arrow:active, #pexminer-view .k-arrow:active, #digiaura-view .k-arrow:active { transform:scale(.92); }
+  #digivox-view .k-arrow svg, #elevaite-view .k-arrow svg, #digikoach-view .k-arrow svg, #pexminer-view .k-arrow svg, #digiaura-view .k-arrow svg { width:40%; height:40%; stroke:var(--text); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* thumbnails now sit right next to the prev/home/next arrows (all bottom-right)
+     instead of floating centered — one control cluster instead of two separate
+     ones. Right offset = arrows' own 24px edge gap + their fixed 3-button width
+     (3×40px + 2×12px gaps = 144px) + a 16px breathing gap between the two groups. */
+  #digivox-view .k-dots, #elevaite-view .k-dots, #digikoach-view .k-dots, #pexminer-view .k-dots, #digiaura-view .k-dots {
+    position:fixed; bottom:22px; right:184px; z-index:70; display:flex; gap:6px; pointer-events:auto;
+    max-width:min(560px, calc(100vw - 260px)); overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none;
+  }
+  #digivox-view .k-arrows, #elevaite-view .k-arrows, #digikoach-view .k-arrows, #pexminer-view .k-arrows, #digiaura-view .k-arrows { position:fixed; bottom:22px; right:24px; z-index:70; display:flex; flex-direction:row; align-items:center; gap:12px; pointer-events:none; }
+  #digivox-view .k-dots::-webkit-scrollbar, #elevaite-view .k-dots::-webkit-scrollbar, #digikoach-view .k-dots::-webkit-scrollbar, #pexminer-view .k-dots::-webkit-scrollbar, #digiaura-view .k-dots::-webkit-scrollbar { display:none; }
+  /* small labeled thumbnail chips — click any one to jump straight to that slide */
+  #digivox-view .k-dot, #elevaite-view .k-dot, #digikoach-view .k-dot, #pexminer-view .k-dot, #digiaura-view .k-dot {
+    flex:none; width:auto; height:auto; border-radius:8px; cursor:pointer; white-space:nowrap;
+    padding:8px 14px; font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:600; letter-spacing:.02em;
+    background:rgba(255,255,255,.06); border:1px solid var(--line-strong); color:var(--text-dim);
+    transition:background .25s ease, border-color .25s ease, color .25s ease, transform .15s ease;
+  }
+  #digivox-view .k-dot:hover, #elevaite-view .k-dot:hover, #digikoach-view .k-dot:hover, #pexminer-view .k-dot:hover, #digiaura-view .k-dot:hover { background:rgba(255,255,255,.1); color:var(--text); }
+  #digivox-view .k-dot:active, #elevaite-view .k-dot:active, #digikoach-view .k-dot:active, #pexminer-view .k-dot:active, #digiaura-view .k-dot:active { transform:scale(.94); }
+  #digivox-view .k-dot.active, #elevaite-view .k-dot.active, #digikoach-view .k-dot.active, #pexminer-view .k-dot.active, #digiaura-view .k-dot.active { background:var(--ember); border-color:var(--ember); color:#181109; }
+  #elevaite-view .k-dot.active { background:var(--gold); border-color:var(--gold); color:#181109; }
+
+
+
+  /* gesture control preview */
+  #digivox-view .k-gesture-preview, #elevaite-view .k-gesture-preview, #digikoach-view .k-gesture-preview, #pexminer-view .k-gesture-preview, #digiaura-view .k-gesture-preview { position:fixed; right:18px; bottom:60px; z-index:70; width:130px; height:98px; border-radius:12px; overflow:hidden; border:1px solid var(--line-strong); background:#000; display:none; box-shadow:0 20px 50px rgba(0,0,0,.5); }
+  #digivox-view .k-gesture-preview.show, #elevaite-view .k-gesture-preview.show, #digikoach-view .k-gesture-preview.show, #pexminer-view .k-gesture-preview.show, #digiaura-view .k-gesture-preview.show { display:block; }
+  #digivox-view .k-gesture-preview video, #elevaite-view .k-gesture-preview video, #digikoach-view .k-gesture-preview video, #pexminer-view .k-gesture-preview video, #digiaura-view .k-gesture-preview video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  #digivox-view .k-gesture-status, #elevaite-view .k-gesture-status, #digikoach-view .k-gesture-status, #pexminer-view .k-gesture-status, #digiaura-view .k-gesture-status { position:absolute; left:6px; bottom:6px; font-size:9px; padding:2px 7px; border-radius:100px; background:rgba(0,0,0,.6); color:#fff; font-family:'JetBrains Mono'; }
+  #digivox-view .k-gesture-flash, #elevaite-view .k-gesture-flash, #digikoach-view .k-gesture-flash, #pexminer-view .k-gesture-flash, #digiaura-view .k-gesture-flash { position:fixed; inset:0; z-index:69; pointer-events:none; opacity:0; transition:opacity .25s ease; }
+  #digivox-view .k-gesture-flash.left, #elevaite-view .k-gesture-flash.left, #digikoach-view .k-gesture-flash.left, #pexminer-view .k-gesture-flash.left, #digiaura-view .k-gesture-flash.left { background:linear-gradient(to right, rgba(242,102,28,.16), transparent 30%); }
+  #digivox-view .k-gesture-flash.right, #elevaite-view .k-gesture-flash.right, #digikoach-view .k-gesture-flash.right, #pexminer-view .k-gesture-flash.right, #digiaura-view .k-gesture-flash.right { background:linear-gradient(to left, rgba(242,102,28,.16), transparent 30%); }
+  #digivox-view .k-gesture-flash.show, #elevaite-view .k-gesture-flash.show, #digikoach-view .k-gesture-flash.show, #pexminer-view .k-gesture-flash.show, #digiaura-view .k-gesture-flash.show { opacity:1; }
+
+  @media (max-width:900px){ #digivox-view .k-gesture-preview, #elevaite-view .k-gesture-preview, #digikoach-view .k-gesture-preview, #pexminer-view .k-gesture-preview, #digiaura-view .k-gesture-preview { display:none; } }
+  /* thumbnail text chips (Intro/Why/How/What you get) take up real space
+     next to the arrows and are fiddly to tap accurately on a phone —
+     hidden on mobile; prev/next arrows and swipe still move between
+     slides, this just drops the "jump straight to a labeled slide" option. */
+  @media (max-width:900px){ #digivox-view .k-dots, #elevaite-view .k-dots, #digikoach-view .k-dots, #pexminer-view .k-dots, #digiaura-view .k-dots { display:none; } }
+  @media (min-width:2400px){ #digivox-view .k-arrow, #elevaite-view .k-arrow, #digikoach-view .k-arrow, #pexminer-view .k-arrow, #digiaura-view .k-arrow { width:52px; height:52px; } #digivox-view .k-dot, #elevaite-view .k-dot, #digikoach-view .k-dot, #pexminer-view .k-dot, #digiaura-view .k-dot { font-size:13.5px; padding:10px 17px; } #digivox-view .k-dots, #elevaite-view .k-dots, #digikoach-view .k-dots, #pexminer-view .k-dots, #digiaura-view .k-dots { right:220px; } }
+
+  /* bigger, crisper display-oriented type across the kiosk */
+  #digivox-view .spot-h { font-size:clamp(34px,4.6vw,64px); }
+  #digivox-view .spot-sub { font-size:clamp(14px,1.05vw,19px); }
+  #digivox-view .hero p.lede, #elevaite-view .hero p.lede, #digikoach-view .hero p.lede, #pexminer-view .hero p.lede, #digiaura-view .hero p.lede { font-size:clamp(16px,1.25vw,21px); }
+  #digivox-view .fact b, #elevaite-view .fact b, #digikoach-view .fact b, #pexminer-view .fact b, #digiaura-view .fact b { font-size:clamp(26px,2.4vw,40px); }
+  #digivox-view .fact span, #elevaite-view .fact span, #digikoach-view .fact span, #pexminer-view .fact span, #digiaura-view .fact span { font-size:clamp(12px,.85vw,15px); }
+  #digivox-view .h-title, #elevaite-view .h-title, #digikoach-view .h-title, #pexminer-view .h-title, #digiaura-view .h-title { font-size:clamp(20px,2.2vw,30px); }
+  #digivox-view .lede, #elevaite-view .lede, #digikoach-view .lede, #pexminer-view .lede, #digiaura-view .lede { font-size:clamp(16px,1.25vw,21px); }
+  #digivox-view .eyebrow, #elevaite-view .eyebrow, #digikoach-view .eyebrow, #pexminer-view .eyebrow, #digiaura-view .eyebrow { font-size:clamp(22px,1.8vw,30px); }
+  #digivox-view .stat b, #elevaite-view .stat b, #digikoach-view .stat b, #pexminer-view .stat b, #digiaura-view .stat b { font-size:clamp(23px,2vw,32px); }
+  #digivox-view .stat span, #elevaite-view .stat span, #digikoach-view .stat span, #pexminer-view .stat span, #digiaura-view .stat span { font-size:clamp(12px,.85vw,15px); }
+  #digivox-view .caption h3, #elevaite-view .caption h3, #digikoach-view .caption h3, #pexminer-view .caption h3, #digiaura-view .caption h3 { font-size:clamp(20px,2.2vw,28px); }
+  #digivox-view .caption p, #elevaite-view .caption p, #digikoach-view .caption p, #pexminer-view .caption p, #digiaura-view .caption p { font-size:clamp(14px,1vw,18px); }
+  #digivox-view .persona .meta b { font-size:clamp(15px,1.1vw,19px); }
+  #digivox-view .persona .meta span { font-size:clamp(12px,.85vw,15px); }
+  #digivox-view .cap-card h3, #elevaite-view .cap-card h3, #digikoach-view .cap-card h3, #pexminer-view .cap-card h3, #digiaura-view .cap-card h3 { font-size:clamp(17px,1.3vw,23px); }
+  #digivox-view .cap-card p, #elevaite-view .cap-card p, #digikoach-view .cap-card p, #pexminer-view .cap-card p, #digiaura-view .cap-card p { font-size:clamp(13px,.95vw,17px); }
+  #digivox-view .benefit b, #elevaite-view .benefit b, #digikoach-view .benefit b, #pexminer-view .benefit b, #digiaura-view .benefit b { font-size:clamp(15px,1.1vw,19px); }
+  #digivox-view .benefit span, #elevaite-view .benefit span, #digikoach-view .benefit span, #pexminer-view .benefit span, #digiaura-view .benefit span { font-size:clamp(12px,.85vw,15px); }
+  #digivox-view .pain-card b, #elevaite-view .pain-card b, #digikoach-view .pain-card b, #pexminer-view .pain-card b, #digiaura-view .pain-card b { font-size:clamp(16px,1.3vw,20px); }
+  #digivox-view .pain-card span, #elevaite-view .pain-card span, #digikoach-view .pain-card span, #pexminer-view .pain-card span, #digiaura-view .pain-card span { font-size:clamp(13px,.95vw,16px); }
+  #digivox-view .quote-block p, #elevaite-view .quote-block p, #digikoach-view .quote-block p, #pexminer-view .quote-block p, #digiaura-view .quote-block p { font-size:clamp(20px,2.5vw,32px); }
+  #digivox-view .btn, #elevaite-view .btn, #digikoach-view .btn, #pexminer-view .btn, #digiaura-view .btn { font-size:clamp(14px,1vw,17px); padding:13px 26px; }
+
+  /* ---------- LARGE / 4K DISPLAYS ----------
+     Every clamp() above tops out well before real 4K widths (most cap
+     around 1300–1350px viewport width), so beyond that point content
+     simply stops growing while the screen keeps getting wider — exactly
+     what makes a product page's content look small and adrift on a big
+     display. This raises the ceilings substantially past that point,
+     with the vw factor tuned so growth continues smoothly into the 4K
+     range instead of flatlining. */
+  @media (min-width:1800px){
+    #digivox-view .wrap, #elevaite-view .wrap, #digikoach-view .wrap, #pexminer-view .wrap, #digiaura-view .wrap { width:min(1900px, 74vw); }
+    #digivox-view .h-title, #elevaite-view .h-title, #digikoach-view .h-title, #pexminer-view .h-title, #digiaura-view .h-title { font-size:clamp(28px, 1.8vw, 40px); }
+    #digivox-view .lede, #elevaite-view .lede, #digikoach-view .lede, #pexminer-view .lede, #digiaura-view .lede { font-size:clamp(18px, 1vw, 26px); max-width:62ch; }
+    #digivox-view .hero p.lede, #elevaite-view .hero p.lede, #digikoach-view .hero p.lede, #pexminer-view .hero p.lede, #digiaura-view .hero p.lede { font-size:clamp(18px, 1vw, 26px); }
+    #digivox-view .eyebrow, #elevaite-view .eyebrow, #digikoach-view .eyebrow, #pexminer-view .eyebrow, #digiaura-view .eyebrow { font-size:clamp(26px, 1.4vw, 36px); }
+    #digivox-view .spot-h { font-size:clamp(50px, 3.2vw, 90px); }
+    #digivox-view .spot-sub { font-size:clamp(16px, .8vw, 22px); }
+    #digivox-view .fact b, #elevaite-view .fact b, #digikoach-view .fact b, #pexminer-view .fact b, #digiaura-view .fact b { font-size:clamp(34px, 2vw, 58px); }
+    #digivox-view .fact span, #elevaite-view .fact span, #digikoach-view .fact span, #pexminer-view .fact span, #digiaura-view .fact span { font-size:clamp(13px, .6vw, 18px); }
+    #digivox-view .stat b, #elevaite-view .stat b, #digikoach-view .stat b, #pexminer-view .stat b, #digiaura-view .stat b { font-size:clamp(28px, 1.6vw, 46px); }
+    #digivox-view .stat span, #elevaite-view .stat span, #digikoach-view .stat span, #pexminer-view .stat span, #digiaura-view .stat span { font-size:clamp(13px, .6vw, 18px); }
+    #digivox-view .caption h3, #elevaite-view .caption h3, #digikoach-view .caption h3, #pexminer-view .caption h3, #digiaura-view .caption h3 { font-size:clamp(22px, 1.8vw, 36px); }
+    #digivox-view .caption p, #elevaite-view .caption p, #digikoach-view .caption p, #pexminer-view .caption p, #digiaura-view .caption p { font-size:clamp(15px, .8vw, 21px); }
+    #digivox-view .cap-card h3, #elevaite-view .cap-card h3, #digikoach-view .cap-card h3, #pexminer-view .cap-card h3, #digiaura-view .cap-card h3 { font-size:clamp(19px, 1vw, 28px); }
+    #digivox-view .cap-card p, #elevaite-view .cap-card p, #digikoach-view .cap-card p, #pexminer-view .cap-card p, #digiaura-view .cap-card p { font-size:clamp(14px, .75vw, 19px); }
+    #digivox-view .cap-num, #elevaite-view .cap-num, #digikoach-view .cap-num, #pexminer-view .cap-num, #digiaura-view .cap-num { font-size:13px; }
+    #digivox-view .benefit b, #elevaite-view .benefit b, #digikoach-view .benefit b, #pexminer-view .benefit b, #digiaura-view .benefit b { font-size:clamp(17px, .85vw, 23px); }
+    #digivox-view .benefit span, #elevaite-view .benefit span, #digikoach-view .benefit span, #pexminer-view .benefit span, #digiaura-view .benefit span { font-size:clamp(13px, .65vw, 18px); }
+    #digivox-view .pain-card b, #elevaite-view .pain-card b, #digikoach-view .pain-card b, #pexminer-view .pain-card b, #digiaura-view .pain-card b { font-size:clamp(18px, 1.1vw, 26px); }
+    #digivox-view .pain-card span, #elevaite-view .pain-card span, #digikoach-view .pain-card span, #pexminer-view .pain-card span, #digiaura-view .pain-card span { font-size:clamp(14px, .65vw, 18px); }
+    #digivox-view .quote-block p, #elevaite-view .quote-block p, #digikoach-view .quote-block p, #pexminer-view .quote-block p, #digiaura-view .quote-block p { font-size:clamp(24px, 1.8vw, 44px); }
+    #digivox-view .btn, #elevaite-view .btn, #digikoach-view .btn, #pexminer-view .btn, #digiaura-view .btn { font-size:clamp(15px, .8vw, 20px); padding:15px 30px; }
+    #digivox-view .tag, #elevaite-view .tag, #digikoach-view .tag, #pexminer-view .tag, #digiaura-view .tag { font-size:13px; padding:5px 12px; }
+    #digivox-view .persona .meta b { font-size:clamp(17px, .9vw, 23px); }
+    #digivox-view .persona .meta span { font-size:clamp(13px, .65vw, 18px); }
+  }
+  @media (min-width:2600px){
+    #digivox-view .wrap, #elevaite-view .wrap, #digikoach-view .wrap, #pexminer-view .wrap, #digiaura-view .wrap { width:min(2400px, 68vw); }
+  }
