@@ -9,6 +9,8 @@ interface Props {
   /** Short prefix for element ids: k / ev / dk / pm / da. */
   prefix: string;
   slides: SlideDef[];
+  /** Product wordmark shown top-right on every slide after the intro. */
+  logo?: string;
 }
 
 const TRANSITION_MS = 700; // keep in sync with the .k-slide CSS transition duration
@@ -22,7 +24,7 @@ type Dir = 'next' | 'prev';
  * GestureHud). Only the open product's deck is mounted, so every window-level
  * listener here belongs to the deck that is actually on screen.
  */
-export default function SlideDeck({ product, prefix, slides }: Props) {
+export default function SlideDeck({ product, prefix, slides, logo }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLElement | null)[]>([]);
   const flashLeft = useRef<HTMLDivElement>(null);
@@ -240,6 +242,17 @@ export default function SlideDeck({ product, prefix, slides }: Props) {
 
   return (
     <div id={`${product}-view`} ref={rootRef} style={{ display: 'block' }}>
+      {/* Persistent product wordmark: hidden on the intro (whose hero logo is
+          the star), then glides from screen centre to the top-right and stays
+          there for every other slide, so the product is always identified. */}
+      {logo && (
+        <img
+          className={`k-deck-logo${idx > 0 ? ' show' : ''}`}
+          src={logo}
+          alt=""
+          aria-hidden="true"
+        />
+      )}
       <div className="k-viewport">
         <div className="k-track" id={`${prefix}Track`}>
           {slides.map((s, i) => (

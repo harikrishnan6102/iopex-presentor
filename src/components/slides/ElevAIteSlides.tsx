@@ -1,5 +1,6 @@
 import type { SlideDef } from '../deck/SlideDef';
 import { Eyebrow, PainCard, ReportShots, TiltShot, mt } from './common';
+import { UseCasesSlide } from './UseCases';
 
 const A = 'https://aurora.growatiopex.com/sites/default/files/2026-09/';
 
@@ -10,7 +11,7 @@ export const ELEVAITE_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="gold">An agentic AI platform</Eyebrow>
-          <h2>Beyond chatbots — AI that<br /><span className="line2">closes the loop, deployed 60% faster.</span></h2>
+          <h2>Beyond chatbots — AI that <span className="line2">closes the loop, deployed 60% faster.</span></h2>
           <p className="lede" style={mt(20)}>ElevAIte is iOPEX's agentic AI platform: Command Agents that don't just answer, they observe, decide, and act across your service chain.</p>
           <ul className="bullet-list">
             <li><b>Horizon 2 Enterprise Innovator</b> — HFS Horizons, Agentic Services 2026</li>
@@ -19,7 +20,7 @@ export const ELEVAITE_SLIDES: SlideDef[] = [
           </ul>
         </div>
         <div className="flow-stage">
-          <img className="ev-flow-bg" src={`${A}Gemini_Generated_Image_vom9nzvom9nzvom9-removebg-preview.png`} alt="" aria-hidden="true" />
+          <img className="ev-flow-bg" src={`${A}elevate.png`} alt="" aria-hidden="true" />
           <img className="ev-logo" id="evLogo" src={`${A}elevaite_logo_negative.png`} alt="elevAIte" />
           <div className="flow-caption mono">Data Studio, Agentic AI Studio, Runtime Platform — the productized foundation of Intelligence as a Service</div>
         </div>
@@ -32,7 +33,7 @@ export const ELEVAITE_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="gold">Why we built this</Eyebrow>
-          <h2 className="h-title">Chatbots answer. They don't act.<br />That gap was costing a 5x efficiency edge.</h2>
+          <h2 className="h-title">Chatbots answer. They don't act. That gap was costing a 5x efficiency edge.</h2>
           <ul className="bullet-list">
             <li>Most companies stall at Phase 1 — conversational AI that talks but doesn't execute</li>
             <li>Workflows still needed a human to manually trigger every next step</li>
@@ -55,7 +56,7 @@ export const ELEVAITE_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="gold">How it works</Eyebrow>
-          <h2 className="h-title">Connect a data source in hours.<br />Ship an agent 60% faster.</h2>
+          <h2 className="h-title">Connect a data source in hours. Ship an agent 60% faster.</h2>
           <div className="pain-grid" style={mt(20)}>
             <PainCard title="Data Studio">ready integrations to Salesforce, ServiceNow, SAP &amp; more; real-time sync via webhooks</PainCard>
             <PainCard title="Agentic AI Studio">low-code, drag-and-drop workflows, model marketplace, pre-built functions</PainCard>
@@ -71,12 +72,22 @@ export const ELEVAITE_SLIDES: SlideDef[] = [
     ),
   },
   {
+    label: 'Use cases', id: 'ev-usecases',
+    content: (
+      <UseCasesSlide title={'From fragmented ops to governed, agentic execution.'} cases={[
+        { tag: 'Cybersecurity · MarTech', title: 'Unifying lead management & ABM ops', problem: 'Siloed MarTech and manual campaigns strained growth and security posture.', solution: 'One governed operating model across lead management, MarTech, and ABM.', metric: 'Marketing spend now tied to pipeline' },
+        { tag: 'Enterprise · ServiceNow', title: 'Accelerating master data governance', problem: 'Rigid ERP processes slowed governance in a regulated environment.', solution: 'Plug-and-play Rapid Deployment Packs with embedded AI on ServiceNow.', metric: '70% faster governance cycles' },
+        { tag: 'Retail Tech · FieldPilot', title: 'Cutting delay out of field service', problem: 'Technicians lost time per call searching manuals and validating parts.', solution: 'FieldPilot embeds real-time intelligence into technician workflows.', metric: '20% fewer truck rolls · 25% faster dispatch · +12% FTFR' },
+      ]} />
+    ),
+  },
+  {
     label: 'What you get', id: 'ev-results',
     content: (
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="gold">What you get</Eyebrow>
-          <h2 className="h-title">Proven speed, proven security,<br />proven at scale.</h2>
+          <h2 className="h-title">Proven speed, proven security, proven at scale.</h2>
           <ul className="bullet-list">
             <li><b>60% faster deployment</b> — pilot to production, not quarters</li>
             <li><b>Hours not weeks</b>, to connect a new enterprise data source</li>

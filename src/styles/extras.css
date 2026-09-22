@@ -129,9 +129,13 @@ html.voice-hidden #logo-carousel .lc-stage { padding-right: 0; }
    their order, so the two can be diffed. */
 
 /* Product-copy spacing: bullet marks sit in a fixed gutter so wrapped lines
-   align under the first, instead of the flex gap shifting per line. */
-.bullet-list li { display: block !important; position: relative; padding-left: 32px !important; gap: 0 !important; }
-.bullet-list li::before { position: absolute !important; left: 2px; top: .35em; margin-top: 0 !important; }
+   align under the first, instead of the flex gap shifting per line.
+   The tick is anchored to the li's top PADDING edge (via --bullet-pad-y),
+   not the border box — the old `top:.35em` ignored the 16px top padding and
+   floated the tick ~11px above the first text line. `.1em` then centres the
+   20px circle against the first line's cap height. */
+.bullet-list li { --bullet-pad-y: 16px; display: block !important; position: relative; padding: var(--bullet-pad-y) 2px var(--bullet-pad-y) 32px !important; gap: 0 !important; }
+.bullet-list li::before { position: absolute !important; left: 2px; top: calc(var(--bullet-pad-y) + .1em); margin-top: 0 !important; }
 
 /* Keep the standalone experience header focused on the iOPEX mark: no
    "Experience" word-mark, no divider. The UI team's build also hid the
@@ -158,10 +162,8 @@ html.voice-hidden #logo-carousel .lc-stage { padding-right: 0; }
   .lc-product-link.current::before { animation: none; background: var(--ember); }
 }
 
-/* iOPEX Guide: a quiet brand-orange border (20%, the same in every state — the
-   UI team toned the earlier bright ring down so the panel stops competing with
-   the slide) + a panel height that does not jump as the transcript line comes
-   and goes. */
+/* iOPEX Guide: bright brand-orange border + a panel height that does not jump
+   as the transcript line comes and goes. */
 .iopex-voice { border-color: rgba(254,94,0,.2) !important; }
 .iopex-voice.is-live, .iopex-voice.is-revealed { border-color: rgba(254,94,0,.2) !important; }
 .iopex-voice.is-speaking, .iopex-voice.is-connecting, .iopex-voice.is-listening { border-color: rgba(254,94,0,.2) !important; }
@@ -184,7 +186,7 @@ html.voice-hidden #logo-carousel .lc-stage { padding-right: 0; }
   mask-composite: exclude;
   pointer-events: none; z-index: 2;
   animation: vbeam-spin 3s linear infinite;
-  /* Kept at 20% visibility in every state (UI team, 21 Sep 2026). */
+  /* Lovable standing patch: glow kept at 20% visibility in every state. */
   opacity: .2;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -247,4 +249,177 @@ html.voice-hidden #logo-carousel .lc-stage { padding-right: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .gate-card, .gate-card.is-wrong { animation: none; }
+}
+
+/* ============ LARGE-PANEL READABILITY (>=1900px CSS width: 4K / 65-75" kiosks) ============
+   The deck's type mostly uses clamp() with max caps tuned for laptop screens,
+   plus a few fixed px sizes; on a 65-75" 4K panel viewed at kiosk distance
+   they read small. This block raises the caps and the fixed sizes, and lets
+   the product imagery (logo orbs, report screenshots) grow past their px
+   ceilings. Scoped to width >= 1900px so laptops are untouched. */
+@media (min-width: 1900px) {
+  /* --- slide typography --- */
+  #digivox-view .eyebrow, #elevaite-view .eyebrow, #digikoach-view .eyebrow, #pexminer-view .eyebrow, #digiaura-view .eyebrow { font-size: clamp(24px, 1.3vw, 34px); margin-bottom: 18px; }
+  #digivox-view .eyebrow i, #elevaite-view .eyebrow i, #digikoach-view .eyebrow i, #pexminer-view .eyebrow i, #digiaura-view .eyebrow i { width: 32px; height: 3px; }
+  #digivox-view .lede, #elevaite-view .lede, #digikoach-view .lede, #pexminer-view .lede, #digiaura-view .lede { font-size: clamp(20px, 1.05vw, 27px); max-width: 56ch; }
+  #digivox-view .h-title, #elevaite-view .h-title, #digikoach-view .h-title, #pexminer-view .h-title, #digiaura-view .h-title { font-size: clamp(36px, 1.9vw, 54px); }
+  #digivox-view .sec-head h2, #elevaite-view .sec-head h2, #digikoach-view .sec-head h2, #pexminer-view .sec-head h2, #digiaura-view .sec-head h2 { font-size: clamp(46px, 2.5vw, 70px); }
+  #digivox-view .dv-intro h2 { font-size: clamp(44px, 2.5vw, 68px); }
+  #digivox-view .spot-h { font-size: clamp(46px, 2.6vw, 72px); }
+  /* elevaite intro headline (plain h2 + .line2, not .h-title) */
+  #elevaite-view .ev-intro h2, #digikoach-view .dk-intro h2, #pexminer-view .pm-intro h2, #digiaura-view .da-intro h2 { font-size: clamp(36px, 1.9vw, 54px); }
+  #digivox-view .caption h3, #elevaite-view .caption h3, #digikoach-view .caption h3, #pexminer-view .caption h3, #digiaura-view .caption h3 { font-size: clamp(26px, 1.4vw, 36px); margin-bottom: 10px; }
+  #digivox-view .quote-block p, #elevaite-view .quote-block p, #digikoach-view .quote-block p, #pexminer-view .quote-block p, #digiaura-view .quote-block p { font-size: clamp(30px, 1.7vw, 42px); }
+  #digivox-view .fact b, #elevaite-view .fact b, #digikoach-view .fact b, #pexminer-view .fact b, #digiaura-view .fact b { font-size: clamp(32px, 1.7vw, 44px); }
+
+  /* checklist bullets — bigger text AND a matching bigger tick, still aligned
+     to the first line via the same --bullet-pad-y anchor */
+  .bullet-list li { --bullet-pad-y: 17px; font-size: clamp(18px, .95vw, 24px) !important; line-height: 1.5 !important; padding-left: 46px !important; }
+  #elevaite-view .bullet-list li::before,
+  #digikoach-view .bullet-list li::before, #pexminer-view .bullet-list li::before, #digiaura-view .bullet-list li::before { width: 27px; height: 27px; }
+
+  /* stat tiles + pain cards */
+  #digivox-view .stat b, #elevaite-view .stat b, #digikoach-view .stat b, #pexminer-view .stat b, #digiaura-view .stat b { font-size: clamp(32px, 1.7vw, 44px); }
+  #digivox-view .stat span, #elevaite-view .stat span, #digikoach-view .stat span, #pexminer-view .stat span, #digiaura-view .stat span { font-size: clamp(14px, .8vw, 18px); }
+  #digivox-view .stat, #elevaite-view .stat, #digikoach-view .stat, #pexminer-view .stat, #digiaura-view .stat { padding: 24px 24px 22px; }
+  #digivox-view .stat-row, #elevaite-view .stat-row, #digikoach-view .stat-row, #pexminer-view .stat-row, #digiaura-view .stat-row { grid-template-columns: repeat(auto-fit, minmax(210px, 270px)); }
+  #digivox-view .pain-card b, #elevaite-view .pain-card b, #digikoach-view .pain-card b, #pexminer-view .pain-card b, #digiaura-view .pain-card b { font-size: clamp(20px, 1.05vw, 27px); }
+  #digivox-view .pain-card span, #elevaite-view .pain-card span, #digikoach-view .pain-card span, #pexminer-view .pain-card span, #digiaura-view .pain-card span { font-size: clamp(15px, .82vw, 19px); }
+  #digivox-view .pain-card, #elevaite-view .pain-card, #digikoach-view .pain-card, #pexminer-view .pain-card, #digiaura-view .pain-card { padding: 22px; }
+
+  /* callout legend + small captions */
+  #digivox-view #dv-report .callout-legend div { font-size: 16px; padding: 12px 18px 12px 12px; }
+  #digivox-view #dv-report .callout-num { width: 28px; height: 28px; font-size: 14px; }
+  #digivox-view .orb-caption, #pexminer-view .orb-caption, #elevaite-view .flow-caption { font-size: 14.5px; }
+  #digivox-view .dv-logo-sm { height: 34px; margin-bottom: 22px; }
+
+  /* --- imagery: let the product visuals grow past their laptop px caps --- */
+  #digivox-view .dv-logo, #digikoach-view .dv-logo, #pexminer-view .dv-logo, #digiaura-view .dv-logo { width: 56%; max-width: 640px; }
+  #elevaite-view .ev-logo { width: 54%; max-width: 600px; }
+  #digivox-view .dv-brain-bg, #digikoach-view .dv-brain-bg, #pexminer-view .dv-brain-bg, #digiaura-view .dv-brain-bg, #elevaite-view .ev-flow-bg { width: 82%; height: 82%; }
+  #digivox-view .orb-stage, #digikoach-view .orb-stage, #pexminer-view .orb-stage, #digiaura-view .orb-stage, #elevaite-view .flow-stage { max-height: 70vh; }
+  #digikoach-view .dk-report-shots, #elevaite-view .dk-report-shots, #pexminer-view .dk-report-shots, #digiaura-view .dk-report-shots { max-width: 1060px; height: min(58vh, 860px); }
+}
+
+/* ============ PEXMINER ARCHITECTURE SLIDE (pm-arch) ============
+   Animated inline-SVG redraw of the team's architecture diagram: connector
+   dashes flow along the pipeline, packets travel the main routes
+   (SMIL animateMotion, no JS), and the service nodes breathe gently. */
+#pexminer-view #pm-arch .wrap { display: block; }
+/* Solid panel behind the diagram — the starfield backdrop was bleeding
+   through the boxes and fighting the diagram for attention. */
+.pm-arch {
+  margin-top: 26px; padding: clamp(16px, 1.6vw, 30px);
+  background: linear-gradient(180deg, rgba(13, 13, 18, 0.94), rgba(10, 10, 14, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 22px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.pm-arch svg { width: 100%; height: auto; display: block; max-height: 70vh; margin: 0 auto; }
+.pm-arch .flow { stroke-dasharray: 7 9; animation: pmArchFlow 1.5s linear infinite; }
+@keyframes pmArchFlow { to { stroke-dashoffset: -16; } }
+.pm-arch .svc rect { transition: none; animation: pmArchBreath 4.2s ease-in-out infinite; }
+.pm-arch .svc:nth-of-type(odd) rect { animation-delay: 2.1s; }
+@keyframes pmArchBreath {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 9px rgba(254, 94, 0, 0.4)); }
+}
+.pm-arch .cbn rect { animation: pmArchCb 4.2s ease-in-out infinite; }
+@keyframes pmArchCb {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 8px rgba(87, 184, 127, 0.4)); }
+}
+/* DB table "write flash" — each pill brightens briefly on its own beat, as
+   if a row just landed. Delay comes per-pill via --d. */
+.pm-arch .pill rect { animation: pmArchWrite 6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes pmArchWrite {
+  0%, 88%, 100% { fill: rgba(111, 170, 79, 0.18); filter: none; }
+  92% { fill: rgba(111, 170, 79, 0.45); filter: drop-shadow(0 0 8px rgba(111, 170, 79, 0.55)); }
+}
+/* callback status dots — steady green heartbeat */
+.pm-arch .cbdot { animation: pmArchDot 1.8s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes pmArchDot { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .pm-arch .flow, .pm-arch .svc rect, .pm-arch .cbn rect, .pm-arch .pill rect, .pm-arch .cbdot { animation: none; }
+  .pm-arch .pkt { display: none; }
+}
+
+/* (Single-row slide titles: the decks' hard <br> breaks were replaced with
+   real spaces directly in the slide markup — no CSS needed.) */
+
+/* ============ USE-CASES SLIDES (all five decks) ============
+   Card grid ported from the team's usecases-5-slides.html, restyled to the
+   kiosk theme: orange->teal top strip, orange problem icon, teal solution
+   icon, teal proof metric. Single-column wrap layout like the arch slide. */
+#digivox-view #dv-usecases .wrap, #elevaite-view #ev-usecases .wrap, #pexminer-view #pm-usecases .wrap,
+#digikoach-view #dk-usecases .wrap, #digiaura-view #da-usecases .wrap { display: block; }
+.uc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 34px; }
+.uc-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 980px; }
+@media (max-width: 980px) { .uc-grid, .uc-grid.cols-2 { grid-template-columns: 1fr; } }
+.uc-card {
+  position: relative; display: flex; flex-direction: column; gap: 13px;
+  background: rgba(14, 15, 19, 0.9); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px; padding: 24px 22px; overflow: hidden;
+}
+.uc-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, #fe5e00, #2fd6c9);
+}
+.uc-tag {
+  color: #fe5e00; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.uc-card h3 { margin: 0; font-size: 17px; line-height: 1.35; font-weight: 700; color: var(--ink, #ececf0); }
+.uc-row { display: flex; gap: 11px; align-items: flex-start; }
+.uc-icon {
+  flex: 0 0 27px; width: 27px; height: 27px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.uc-icon svg { width: 14px; height: 14px; }
+.uc-problem .uc-icon { background: rgba(254, 94, 0, 0.14); }
+.uc-problem .uc-icon svg { stroke: #fe5e00; }
+.uc-solution .uc-icon { background: rgba(47, 214, 201, 0.13); }
+.uc-solution .uc-icon svg { stroke: #2fd6c9; }
+.uc-txt { font-size: 13.5px; line-height: 1.5; color: rgba(236, 236, 240, 0.62); }
+.uc-txt b { display: block; color: rgba(236, 236, 240, 0.92); font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
+.uc-metric { margin-top: auto; padding-top: 13px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 10px; }
+.uc-metric .uc-icon { background: rgba(255, 255, 255, 0.08); }
+.uc-metric .uc-icon svg { stroke: rgba(236, 236, 240, 0.9); }
+.uc-val { font-size: 14.5px; font-weight: 700; color: #2fd6c9; }
+
+@media (min-width: 1900px) {
+  .uc-grid { gap: 28px; margin-top: 42px; }
+  .uc-grid.cols-2 { max-width: 1240px; }
+  .uc-card { padding: 30px 28px; gap: 16px; border-radius: 16px; }
+  .uc-tag { font-size: clamp(12px, .7vw, 15px); }
+  .uc-card h3 { font-size: clamp(18px, 1.05vw, 25px); }
+  .uc-txt { font-size: clamp(14px, .8vw, 18px); }
+  .uc-txt b { font-size: clamp(12px, .65vw, 14px); }
+  .uc-val { font-size: clamp(15px, .85vw, 20px); }
+  .uc-icon { flex-basis: 32px; width: 32px; height: 32px; }
+  .uc-icon svg { width: 17px; height: 17px; }
+}
+
+/* ============ PERSISTENT DECK LOGO (top-right) ============
+   Each product's wordmark. Hidden on the intro slide (the hero logo carries
+   it there); when the deck moves past the intro, it glides from the middle
+   of the screen up into the top-right — timed slightly longer than the
+   700ms slide transition so the motion reads as the hero logo travelling —
+   and stays pinned there on every subsequent slide. Sits left of the
+   gesture/camera buttons in the dock bar. */
+.k-deck-logo {
+  position: fixed;
+  top: clamp(16px, 2.2vh, 26px);
+  right: clamp(130px, 10vw, 190px);
+  height: clamp(28px, 3.4vh, 46px);
+  width: auto;
+  z-index: 81;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(calc(-50vw + 50% + clamp(130px, 10vw, 190px)), 38vh) scale(2.6);
+  transition: transform .95s cubic-bezier(.22, .9, .26, 1), opacity .6s ease .1s;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .55));
+}
+.k-deck-logo.show { opacity: 1; transform: translate(0, 0) scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .k-deck-logo { transition: opacity .4s ease; transform: none; }
 }

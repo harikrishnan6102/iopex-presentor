@@ -10,6 +10,10 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { CAM_DRIFT_BY_PRODUCT, type CamDrift, type ProductId } from '../data/products';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -36,39 +40,42 @@ const isLowPowerDevice =
   (navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency <= 4) ||
   (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 4) ||
   window.innerWidth <= 820;
-/* Capped lower than the display can do: on a 4K/retina kiosk the particle
-   passes were the single biggest GPU cost, and the difference between 1.5×
-   and 2× is invisible at viewing distance. Every frame updates the field —
-   the every-other-frame stride read as a stutter on low-power devices. */
-const PIXEL_RATIO_CAP = isLowPowerDevice ? 1.25 : 1.5;
+/* Capped lower than the display can do on weak hardware only. The old blanket
+   1.5 cap was the "blurry on 4K" bug: a 65-75" 4K kiosk running at 200% OS
+   scaling has devicePixelRatio 2, so capping at 1.5 rendered at 75% of native
+   resolution and upscaled — visibly soft at that panel size. Capable devices
+   now render up to DPR 2 (true 4K native); the low-power path keeps its cap. */
+const PIXEL_RATIO_CAP = isLowPowerDevice ? 1.25 : 2;
 const PARTICLE_UPDATE_STRIDE = 1;
 
 function balancedPixelRatio(): number {
   return Math.max(1, Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
 }
 
-/* soft radial glow sprite, generated at runtime on a small canvas */
-function makeGlowSprite(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d')!;
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.35, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.62, 'rgba(255,255,255,.4)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-
 /* PointsMaterial only exposes a single uniform "size"; multiply it by our own
-   per-vertex "aSize" attribute at compile time. */
-function perVertexSize(mat: THREE.PointsMaterial): void {
+   per-vertex "aSize" attribute at compile time. The same patch also replaces
+   the old 64x64 bitmap glow sprite with an ANALYTIC circular falloff computed
+   per fragment from gl_PointCoord. The bitmap was the "box glow" bug on 4K:
+   at small on-screen sizes the GPU samples its deep mip levels, where the
+   circular alpha mask has been averaged into a semi-transparent SQUARE
+   covering the whole quad (and with mipmaps off it aliases into a hard
+   square instead). Computing the disc mathematically keeps every particle a
+   perfect crisp circle at any size, on any resolution — and skips a texture
+   fetch per fragment. */
+function patchParticleMaterial(mat: THREE.PointsMaterial): void {
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', 'attribute float aSize;\n#include <common>')
       .replace('gl_PointSize = size;', 'gl_PointSize = size * aSize;');
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'vec4 diffuseColor = vec4( diffuse, opacity );',
+      [
+        'float _pd = length( gl_PointCoord - vec2( 0.5 ) );',
+        'float _disc = 1.0 - smoothstep( 0.32, 0.5, _pd );',
+        'if ( _disc <= 0.004 ) discard;',
+        'vec4 diffuseColor = vec4( diffuse, opacity * _disc );',
+      ].join('\n'),
+    );
   };
 }
 
@@ -113,7 +120,10 @@ const connector = buildShape([
   { type: 'M', x: 102.77, y: 17.97 },
   { type: 'L', x: 102.77, y: 152.57 },
   { type: 'C', c1x: 102.77, c1y: 158.89, c2x: 104.50, c2y: 165.11, x: 107.77, y: 170.53 },
-  { type: 'Q', cx: 111.04, cy: 175.95, x: 72.81, y: 170.53 },
+  /* bottom cap: control point centred between the two bottom tips (was
+     x:111.04 — right of the right tip — which skewed the whole bottom
+     flare sideways and left a thin, badly-sampled sliver on the left) */
+  { type: 'Q', cx: 90.29, cy: 176.4, x: 72.81, y: 170.53 },
   { type: 'C', c1x: 76.09, c1y: 165.10, c2x: 77.82, c2y: 158.89, x: 77.82, y: 152.56 },
   { type: 'L', x: 77.82, y: 17.97 },
   { type: 'C', c1x: 77.82, c1y: 11.64, c2x: 76.09, c2y: 5.42, x: 72.81, y: 0 },
@@ -169,9 +179,9 @@ function sampleShapePoints(shape: THREE.Shape, count: number, depth: number, out
 
 interface DepthLayer { key: string; share: number; rMin: number; rMax: number; sizeMin: number; sizeMax: number; colorMul: number; parallax: number }
 const DEPTH_LAYERS: DepthLayer[] = [
-  { key: 'near', share: 0.30, rMin: 3,  rMax: 11, sizeMin: 1.1,  sizeMax: 4.2, colorMul: 1.05, parallax: 1.00 },
-  { key: 'mid',  share: 0.40, rMin: 9,  rMax: 24, sizeMin: 0.6,  sizeMax: 2.2, colorMul: 0.80, parallax: 0.50 },
-  { key: 'far',  share: 0.30, rMin: 20, rMax: 62, sizeMin: 0.25, sizeMax: 1.0, colorMul: 0.50, parallax: 0.18 },
+  { key: 'near', share: 0.30, rMin: 3,  rMax: 11, sizeMin: 0.8,  sizeMax: 2.0, colorMul: 1.05, parallax: 1.00 },
+  { key: 'mid',  share: 0.40, rMin: 9,  rMax: 24, sizeMin: 0.45, sizeMax: 1.2, colorMul: 0.80, parallax: 0.50 },
+  { key: 'far',  share: 0.30, rMin: 20, rMax: 62, sizeMin: 0.2,  sizeMax: 0.6, colorMul: 0.50, parallax: 0.18 },
 ];
 
 interface Keyframe { t: number; scale: number; camZ: number; look: [number, number]; zoomZ: number }
@@ -206,6 +216,8 @@ export class ParticleScene {
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly composer: EffectComposer;
+  private readonly bloomPass: UnrealBloomPass;
   private readonly pmrem: THREE.PMREMGenerator;
   private readonly clock = new THREE.Clock();
   private readonly lookTarget = new THREE.Vector3();
@@ -224,15 +236,16 @@ export class ParticleScene {
   private scrollSurge = 0;
   private lastScrollProgress = 0;
 
-  // logo swarm
+  // logo swarm — connector count raised so the centre "I" reads as densely
+  // as the crescents (it was 1200 vs 2200 per crescent and looked sparse,
+  // especially at its exposed top/bottom ends)
   private readonly LOGO_COUNTS = isLowPowerDevice
-    ? { rightCrescent: 1400, leftCrescent: 1400, connector: 800 }
-    : { rightCrescent: 2200, leftCrescent: 2200, connector: 1200 };
+    ? { rightCrescent: 1400, leftCrescent: 1400, connector: 1250 }
+    : { rightCrescent: 2200, leftCrescent: 2200, connector: 1950 };
   private readonly LOGO_PARTICLE_COUNT = this.LOGO_COUNTS.rightCrescent + this.LOGO_COUNTS.leftCrescent + this.LOGO_COUNTS.connector;
   private logoGeometry!: THREE.BufferGeometry;
   private logoGroup = new THREE.Group();
   private logoParticleMat!: THREE.PointsMaterial;
-  private logoHaloMat!: THREE.PointsMaterial;
   private logoBasePositions!: Float32Array;
   private logoStartPositions!: Float32Array;
   private logoSide!: Float32Array;
@@ -273,13 +286,44 @@ export class ParticleScene {
     this.camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
     this.camera.position.set(0, 0, 11);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
     this.renderer.setPixelRatio(balancedPixelRatio());
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     opts.container.appendChild(this.renderer.domElement);
+
+    /* REAL BLOOM — the mechanism the reference uses for its glow. The
+       reference's own strength/radius/threshold (1.8 / 0.4 / 0) were tuned
+       for ITS scene (20,000 tightly-packed tetrahedra); dropped onto a
+       sparser scene with soft round sprites and a threshold of 0, it bloomed
+       EVERYTHING — including dim background specks — into big soft blurry
+       squares instead of crisp glowing points. Lower strength/radius and a
+       real threshold keep the glow tight around genuinely bright points
+       instead of smearing the whole frame. */
+    /* REAL BLOOM — kept deliberately TIGHT and CHEAP:
+       - low radius + moderate strength = a thin halo hugging each particle
+         (crystal points, not gaussian smear)
+       - higher threshold = only genuinely hot pixels enter the blur chain
+       - and the pass itself runs at a capped resolution (see capBloomSize):
+         bloom is low-frequency by nature, so computing it above ~1080p on a
+         4K panel burns GPU for no visible gain — this was the main source of
+         the lag once the canvas moved to native 4K. */
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.45, 0.05, 0.3,
+    );
+    this.composer.addPass(this.bloomPass);
+    this.composer.addPass(new OutputPass()); // applies tone mapping + color space after bloom
+    /* The composer snapshots the renderer's pixel ratio at construction and
+       never re-reads it — its buffers must be told explicitly, or the whole
+       post chain renders below canvas resolution and upscales (soft/blurry
+       on large panels). */
+    this.composer.setPixelRatio(balancedPixelRatio());
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.capBloomSize();
 
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
     this.pmrem.compileEquirectangularShader();
@@ -348,6 +392,8 @@ export class ParticleScene {
       }
     });
     this.pmrem.dispose();
+    this.bloomPass.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -384,7 +430,7 @@ export class ParticleScene {
     const N = this.PARTICLE_COUNT;
     const positions = new Float32Array(N * 3);
     const colors = new Float32Array(N * 3);
-    const cWarm = new THREE.Color(0xffd9b0), cGold = new THREE.Color(0xffc845), cTeal = new THREE.Color(0x54d9c6);
+    const cWarm = new THREE.Color(0xffd9b0), cGold = new THREE.Color(0xff7f1a), cTeal = new THREE.Color(0x54d9c6);
     let idx = 0;
     for (let li = 0; li < DEPTH_LAYERS.length; li++) {
       const layer = DEPTH_LAYERS[li];
@@ -400,13 +446,14 @@ export class ParticleScene {
         this.particleBase[i * 3] = x; this.particleBase[i * 3 + 1] = y; this.particleBase[i * 3 + 2] = z;
         this.particlePhase[i] = Math.random() * Math.PI * 2;
         this.particleTwinklePhase[i] = Math.random() * Math.PI * 2;
-        this.particleTwinkleFreq[i] = 0.5 + Math.random() * 1.6;
+        this.particleTwinkleFreq[i] = 0.12 + Math.random() * 0.3; // slow, calm shimmer
         const depthT = (r - layer.rMin) / Math.max(1, layer.rMax - layer.rMin);
         this.particleBaseSize[i] = lerp(layer.sizeMax, layer.sizeMin, depthT) * (0.7 + 0.6 * Math.random());
         this.particleParallax[i] = layer.parallax;
         positions[i * 3] = x; positions[i * 3 + 1] = y; positions[i * 3 + 2] = z;
         const roll = Math.random();
-        const col = roll < 0.78 ? cWarm : roll < 0.94 ? cGold : cTeal;
+        // more of the ambient field on the vivid orange stop, less on cream/teal
+        const col = roll < 0.45 ? cWarm : roll < 0.90 ? cGold : cTeal;
         const dim = layer.colorMul * (0.85 + 0.3 * Math.random());
         colors[i * 3] = col.r * dim; colors[i * 3 + 1] = col.g * dim; colors[i * 3 + 2] = col.b * dim;
       }
@@ -418,7 +465,6 @@ export class ParticleScene {
 
     const mat = new THREE.PointsMaterial({
       vertexColors: true,
-      map: makeGlowSprite(),
       size: 0.05,
       sizeAttenuation: true,
       transparent: true,
@@ -427,7 +473,7 @@ export class ParticleScene {
       fog: true,
       blending: THREE.AdditiveBlending,
     });
-    perVertexSize(mat);
+    patchParticleMaterial(mat);
     return new THREE.Points(geo, mat);
   }
 
@@ -441,31 +487,56 @@ export class ParticleScene {
     sampleShapePoints(leftCrescent, C.leftCrescent, LOGO_DEPTH, logoPositions, C.rightCrescent);
     sampleShapePoints(connector, C.connector, LOGO_DEPTH, logoPositions, C.rightCrescent + C.leftCrescent);
 
-    /* crescents in iOPEX orange; the connector "I" white with a warm tint */
-    const CRESCENT_COLOR = new THREE.Color(0xf2661c);
-    const CONNECTOR_COLOR = new THREE.Color(0xfff1d6).lerp(new THREE.Color(0xffffff), 0.6);
+    /* COLOR — the crescents ported from the reference's own formula:
+         const hue = 0.015 + 0.055 * (0.5 + 0.5*Math.sin(angle + time*flow*0.4));
+         const light = 0.28 + 0.5 * (0.5 + 0.5*Math.sin(band*0.12 + angle*2.0));
+         color.setHSL(hue, 1.0, light);
+       i.e. HSL, saturation locked at 1.0, hue swept across a narrow 5°-25°
+       red->orange band. The reference animates hue/lightness per particle's
+       flight angle; ours are static, so each particle takes one fixed roll
+       on the same ranges instead. Lightness pushed a touch brighter here so
+       more of the mark clears the bloom threshold — a more prominent glow —
+       without touching bloom's radius/strength globally (that's what caused
+       the blur last time).
+       The connector "I" is deliberately NOT on this ramp — light grey/white,
+       near-zero saturation, so it reads as a distinct bright spine down the
+       middle of the mark rather than blending into the orange crescents. */
+    const CRESCENT_BASE = new THREE.Color(0xfe5e00); // exact brand hex
+    const tmp = new THREE.Color();
     const logoColors = new Float32Array(N * 3);
-    const paintRange = (color: THREE.Color, start: number, count: number) => {
-      for (let i = 0; i < count; i++) {
-        const w = (start + i) * 3;
-        logoColors[w] = color.r; logoColors[w + 1] = color.g; logoColors[w + 2] = color.b;
+    const connectorStart = C.rightCrescent + C.leftCrescent;
+
+    /* two-tier sizes: ~78% fine dust, ~22% sparse glowing accent points —
+       raised from 5% so there are visibly MORE bright/electric-orange points
+       instead of a few standing out. Accent size capped much lower than
+       before (was 1.5-2.4x, now 1.15-1.6x) — that oversized tier combined
+       with bloom's mip-chain blur is what read as "big boxy" particles. */
+    const sizeMul = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const isAccent = Math.random() > 0.78;
+      sizeMul[i] = isAccent ? 1.15 + Math.random() * 0.45 : 0.28 + Math.pow(Math.random(), 2) * 0.4;
+      if (i >= connectorStart) {
+        // connector "I" — light grey/white, barely tinted warm, not orange
+        const light = isAccent ? 0.72 + Math.random() * 0.14 : 0.55 + Math.random() * 0.2;
+        tmp.setHSL(0.08, 0.05 + Math.random() * 0.05, light);
+      } else {
+        // both crescents — EXACTLY #fe5e00, varied only by intensity.
+        // Scaling RGB preserves the hue/chroma ratio, so a dim particle is a
+        // darker #fe5e00 and a hot one is a brighter #fe5e00 that bloom picks
+        // up. (The previous HSL-lightness approach was the maroon/pink bug:
+        // lightness below 0.5 muddied toward maroon, above 0.5 washed toward
+        // salmon — almost nothing actually sat on the brand color.)
+        const v = isAccent ? 1.15 + Math.random() * 0.55 : 0.62 + Math.random() * 0.38;
+        tmp.copy(CRESCENT_BASE).multiplyScalar(v);
       }
-    };
-    paintRange(CRESCENT_COLOR, 0, C.rightCrescent);
-    paintRange(CRESCENT_COLOR, C.rightCrescent, C.leftCrescent);
-    paintRange(CONNECTOR_COLOR, C.rightCrescent + C.leftCrescent, C.connector);
+      const w = i * 3;
+      logoColors[w] = tmp.r; logoColors[w + 1] = tmp.g; logoColors[w + 2] = tmp.b;
+    }
+
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(logoPositions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(logoColors, 3));
-
-    /* two-tier sizes: ~95% fine dust, ~5% sparse glowing accent points */
-    const sizeMul = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      sizeMul[i] = Math.random() > 0.95
-        ? 2.2 + Math.random() * 1.8
-        : 0.32 + Math.pow(Math.random(), 2) * 0.5;
-    }
     geo.setAttribute('aSize', new THREE.BufferAttribute(sizeMul, 1));
 
     /* re-centre on the true bounding-box centre so it spins on its own axis */
@@ -503,7 +574,7 @@ export class ParticleScene {
       this.logoSwarmTurbPhase[i] = Math.random() * Math.PI * 2;
       this.logoSwarmTurbFreq[i] = 0.6 + Math.random() * 1.3;
       this.logoTwinklePhase[i] = Math.random() * Math.PI * 2;
-      this.logoTwinkleFreq[i] = 0.7 + Math.random() * 1.8;
+      this.logoTwinkleFreq[i] = 0.15 + Math.random() * 0.35; // slow, calm shimmer
     }
 
     /* FORMATION + IDLE MOTION SETUP */
@@ -524,20 +595,15 @@ export class ParticleScene {
       this.logoIdleAmp[i] = 0.012 + Math.random() * 0.03;
     }
 
+    /* Single pass only — real bloom (below) now does the glow, so the manual
+       halo + corona sprite layers that used to fake it are gone. Keeping
+       them alongside real bloom would double up and wash the mark out. */
     this.logoParticleMat = new THREE.PointsMaterial({
-      vertexColors: true, map: makeGlowSprite(), size: 0.021, sizeAttenuation: true,
+      vertexColors: true, size: 0.03, sizeAttenuation: true,
       transparent: true, opacity: 1.0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
     });
-    perVertexSize(this.logoParticleMat);
+    patchParticleMaterial(this.logoParticleMat);
     this.logoGroup.add(new THREE.Points(geo, this.logoParticleMat));
-
-    /* GLOW HALO PASS — same geometry, ~3× larger, low additive opacity */
-    this.logoHaloMat = new THREE.PointsMaterial({
-      vertexColors: true, map: makeGlowSprite(), size: 0.062, sizeAttenuation: true,
-      transparent: true, opacity: 0.32, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
-    });
-    perVertexSize(this.logoHaloMat);
-    this.logoGroup.add(new THREE.Points(geo, this.logoHaloMat));
   }
 
   /* ------------------------------------------------------------ events --- */
@@ -547,7 +613,24 @@ export class ParticleScene {
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(balancedPixelRatio());
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    /* keep the post chain at the same resolution as the canvas; setSize
+       propagates (width x pixelRatio) to every pass, bloom included — so the
+       bloom cap must be re-applied AFTER it */
+    this.composer.setPixelRatio(balancedPixelRatio());
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.capBloomSize();
   };
+
+  /* The scene renders at full native resolution, but the bloom pass does not
+     need to: its output is a soft low-frequency halo. Capping its internal
+     render targets at ~1080p cuts the heaviest GPU cost on 4K panels with no
+     visible difference in the glow. */
+  private capBloomSize(): void {
+    const pr = balancedPixelRatio();
+    const w = Math.min(Math.round(window.innerWidth * pr), 2560);
+    const h = Math.min(Math.round(window.innerHeight * pr), 1440);
+    this.bloomPass.setSize(w, h);
+  }
 
   private onMouseMove = (e: MouseEvent): void => {
     this.mouseTarget.x = (e.clientX / window.innerWidth - 0.5) * 2;
@@ -611,7 +694,7 @@ export class ParticleScene {
       arr[i * 3]     = bx * kick + fx * flowAmp * 0.45 + mouse.x * this.particleParallax[i] * PARALLAX_STRENGTH;
       arr[i * 3 + 1] = by * kick + fy * flowAmp * 0.45 + wave - mouse.y * this.particleParallax[i] * PARALLAX_STRENGTH;
       arr[i * 3 + 2] = bz * kick + fz * flowAmp * 0.35;
-      sizeArr[i] = this.particleBaseSize[i] * (0.7 + 0.55 * (0.5 + 0.5 * Math.sin(t * this.particleTwinkleFreq[i] + this.particleTwinklePhase[i])));
+      sizeArr[i] = this.particleBaseSize[i] * (0.88 + 0.24 * (0.5 + 0.5 * Math.sin(t * this.particleTwinkleFreq[i] + this.particleTwinklePhase[i])));
     }
     posAttr.needsUpdate = true;
     sizeAttr.needsUpdate = true;
@@ -628,7 +711,7 @@ export class ParticleScene {
     if (this.opts.isProductOpen()) {
       this.logoGroup.visible = false;
       this.updateAmbientField(t);
-      this.renderer.render(this.scene, this.camera);
+      this.composer.render();
       return;
     }
     this.logoGroup.visible = true;
@@ -711,15 +794,14 @@ export class ParticleScene {
       logoArr[lw + 2] = lerp(sz, tz, e) + wz;
 
       const scatterThin = this.logoScatterKeep[li] ? 1 : 1 - e * 0.88;
-      logoSizeArr[li] = this.logoBaseSizes[li] * scatterThin * (0.9 + 0.5 * (0.5 + 0.5 * Math.sin(t * this.logoTwinkleFreq[li] + this.logoTwinklePhase[li])));
+      logoSizeArr[li] = this.logoBaseSizes[li] * scatterThin * (0.92 + 0.2 * (0.5 + 0.5 * Math.sin(t * this.logoTwinkleFreq[li] + this.logoTwinklePhase[li])));
     }
     posAttr.needsUpdate = true;
     sizeAttr.needsUpdate = true;
     this.logoParticleMat.opacity = lerp(1.0, 0.6, split);
-    this.logoHaloMat.opacity = lerp(0.32, 0.2, split);
     this.opts.onSplit(split);
 
     this.updateAmbientField(t);
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   };
 }

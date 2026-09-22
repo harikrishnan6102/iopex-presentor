@@ -1,5 +1,6 @@
 import type { SlideDef } from '../deck/SlideDef';
 import { Eyebrow, PainCard, ReportShots, TiltShot, mt } from './common';
+import { UseCasesSlide } from './UseCases';
 
 const A = 'https://aurora.growatiopex.com/sites/default/files/2026-09/';
 
@@ -19,7 +20,7 @@ export const DIGIAURA_SLIDES: SlideDef[] = [
           </ul>
         </div>
         <div className="orb-stage">
-          <img className="dv-brain-bg" src={`${A}Gemini_Generated_Image_7a558r7a558r7a55-removebg-preview.png`} alt="" aria-hidden="true" />
+          <img className="dv-brain-bg" src={`${A}Gemini_Generated_Image_7a558r7a558r7a55-Photoroom.png`} alt="" aria-hidden="true" />
           <img className="dv-logo" src={`${A}Digiaura%20logo.png`} alt="DigiAura" />
         </div>
       </div>
@@ -31,7 +32,7 @@ export const DIGIAURA_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="ember">Why we built this</Eyebrow>
-          <h2 className="h-title">Software delivery doesn't fail in one place.<br />It fails at every hand-off.</h2>
+          <h2 className="h-title">Software delivery doesn't fail in one place. It fails at every hand-off.</h2>
           <ul className="bullet-list">
             <li>Requirements get reinterpreted — or quietly lost — moving from stakeholder to engineer</li>
             <li>Every review and iteration cycle costs days, because it waits on a human queue</li>
@@ -49,7 +50,7 @@ export const DIGIAURA_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="ember">Features: the AI-DLC agent chain</Eyebrow>
-          <h2 className="h-title">One agent team. Zero handoffs.<br />Full control over how they work.</h2>
+          <h2 className="h-title">One agent team. Zero handoffs. Full control over how they work.</h2>
           <div className="pain-grid" style={mt(20)}>
             <PainCard title="Five agents, one pipeline">Requirement → Development → Verification → Deployment, plus a live visibility layer over every stage. Nothing falls through the gap between them.</PainCard>
             <PainCard title="Connects to what you already run">Native MCP integrations — Salesforce, ServiceNow, Jira, and more. Agents work inside your existing tools, not around them.</PainCard>
@@ -59,6 +60,15 @@ export const DIGIAURA_SLIDES: SlideDef[] = [
         </div>
         <TiltShot src={`${A}Screenshot%202026-09-12%20at%201.03.54%E2%80%AFPM.png`} alt="DigiAura" />
       </div>
+    ),
+  },
+  {
+    label: 'Use cases', id: 'da-usecases',
+    content: (
+      <UseCasesSlide title={'One agent pipeline. Zero handoff friction.'} cases={[
+        { tag: 'Enterprise client', title: 'Building an app with agents, not sprints', problem: 'Needed a full Incident Management application built without the usual BA→Dev→Test→Deploy handoff delays.', solution: 'Autonomous agents executed the BA, Developer, Tester, and Deployment roles end-to-end; humans acted strictly as approvers.', metric: 'Full app shipped, human role = approval only' },
+        { tag: 'Enterprise client', title: 'No lost context across tools', problem: 'Requirements traditionally lost fidelity moving across Jira, GitHub, Salesforce, and ServiceNow.', solution: 'Requirements connect directly to code and tests across all four tools with no manual intervention.', metric: 'Zero manual handoff between stages' },
+      ]} />
     ),
   },
   {

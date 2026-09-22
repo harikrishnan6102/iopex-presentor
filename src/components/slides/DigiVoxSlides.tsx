@@ -1,5 +1,6 @@
 import type { SlideDef } from '../deck/SlideDef';
 import { Eyebrow, PainCard, ShotFrame, Stat, TiltShot, mt } from './common';
+import { UseCasesSlide } from './UseCases';
 
 const A = 'https://aurora.growatiopex.com/sites/default/files/2026-09/';
 
@@ -10,7 +11,7 @@ export const DIGIVOX_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="ember">Live Interviews. Zero Coordination.</Eyebrow>
-          <h2>Interviews that<br /><span className="line2">actually listen.</span></h2>
+          <h2>Interviews that <span className="line2">actually listen.</span></h2>
           <p className="lede" style={mt(20)}>One job description in. A ranked, proctored, bias-free shortlist out. DigiVox runs the entire interview — live, adaptive, and always on — so your team spends its time deciding, not scheduling.</p>
           <div className="stat-row">
             <Stat count={15000} suffix="+">interviews processed</Stat>
@@ -24,7 +25,7 @@ export const DIGIVOX_SLIDES: SlideDef[] = [
           </div>
         </div>
         <div className="orb-stage">
-          <img className="dv-brain-bg" src={`${A}Gemini_Generated_Image_o9cwwco9cwwco9cw_1-removebg-preview.png`} alt="" aria-hidden="true" />
+          <img className="dv-brain-bg" src={`${A}digivox.png`} alt="" aria-hidden="true" />
           <img className="dv-logo" id="dvLogo" src={`${A}Digivox-logo-white_updated%20%282%29.png`} alt="DigiVox" />
           <div className="orb-caption mono">live signal · behavioral &amp; NLP analysis</div>
         </div>
@@ -37,7 +38,7 @@ export const DIGIVOX_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="ember">Why we built this</Eyebrow>
-          <h2 className="h-title">What we kept hearing<br />from hiring teams.</h2>
+          <h2 className="h-title">What we kept hearing from hiring teams.</h2>
           <div className="quote-block">
             <p>Bias, inconsistency, wasted hours, and hires who cheated their way in. We built DigiVox to close all four gaps.</p>
           </div>
@@ -58,7 +59,7 @@ export const DIGIVOX_SLIDES: SlideDef[] = [
       <div className="wrap">
         <div data-anim>
           <Eyebrow tone="ember">How it works</Eyebrow>
-          <h2 className="h-title">Set it up once.<br />DigiVox runs the rest.</h2>
+          <h2 className="h-title">Set it up once. DigiVox runs the rest.</h2>
           <div className="pain-grid" style={mt(20)}>
             <PainCard title="Step 1 — Create the interview">JD upload → auto-generated questions + metrics → customization.</PainCard>
             <PainCard title="Step 2 — Add candidates">Bulk upload, resume evaluation, custom timing/expiry.</PainCard>
@@ -72,12 +73,22 @@ export const DIGIVOX_SLIDES: SlideDef[] = [
     ),
   },
   {
+    label: 'Use cases', id: 'dv-usecases',
+    content: (
+      <UseCasesSlide title={'Real hiring teams. Real bottlenecks. Solved with DigiVox.'} cases={[
+        { tag: 'Global Operations Company', title: 'Eliminating the screening-panel bottleneck', problem: 'Scarce TA panels caused long queues and candidate drop-off at walk-in drives.', solution: 'Parallel AI interviews replace the initial screening panel entirely.', metric: '500 interviews run simultaneously' },
+        { tag: 'Global IT Major', title: 'High-volume screening on a fixed deadline', problem: 'A major campus drive needed a large applicant pool screened in days, not weeks.', solution: 'Automated proctoring and scoring ran the entire first round.', metric: '1,800 students screened in 3 days' },
+        { tag: 'ServiceNow Hiring', title: 'Freeing senior engineers from first-round screens', problem: 'Senior engineers at a ServiceNow-based hiring desk were pulled into unfiltered first-round technical screening.', solution: 'Proctored AI assessments replace the panel; only verified candidates reach engineers.', metric: '100% pre-qualified final rounds' },
+      ]} />
+    ),
+  },
+  {
     label: 'Results', id: 'dv-report',
     content: (
       <div className="wrap" style={{ display: 'block' }}>
         <div data-anim>
           <Eyebrow tone="ember">After the interview</Eyebrow>
-          <h2 className="h-title">Every interview ends in a decision,<br />not a transcript to dig through.</h2>
+          <h2 className="h-title">Every interview ends in a decision, not a transcript to dig through.</h2>
         </div>
         <div className="report-shots-row" data-anim>
           <div className="report-shot-col">
